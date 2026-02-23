@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { HuntCard } from '@/components/hunt-card';
+import { HuntCard } from '@/components/marketplace/HuntCard';
 import { ArrowRight, Search, MapPin, Target, UserCheck } from 'lucide-react';
 import { hunts } from '@/lib/data';
 import { PlaceHolderImages } from '@/lib/placeholder-images';

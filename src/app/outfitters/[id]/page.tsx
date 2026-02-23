@@ -4,7 +4,7 @@ import { outfitters, hunts, reviews as allReviews } from '@/lib/data';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { HuntCard } from '@/components/hunt-card';
+import { HuntCard } from '@/components/marketplace/HuntCard';
 import { ReviewStars } from '@/components/review-stars';
 import { CheckCircle, MessageSquare, Star } from 'lucide-react';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
