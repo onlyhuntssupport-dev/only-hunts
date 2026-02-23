@@ -51,8 +51,6 @@ export const outfitters = [
   },
 ];
 
-const ZAR_EXCHANGE_RATE = 18.5;
-
 export const hunts = [
   {
     id: '101',
@@ -60,14 +58,13 @@ export const hunts = [
     outfitterName: 'Kalahari Precision Safaris',
     title: 'Kalahari Gemsbok & Springbok Package',
     species: ['Gemsbok', 'Springbok'],
-    priceUSD: 4500,
-    priceZAR: Math.round(4500 * ZAR_EXCHANGE_RATE),
+    basePrice: 4500,
+    baseCurrency: 'USD',
+    province: 'Northern Cape',
     isVerified: true,
-    duration: '7 Days',
-    type: 'Rifle',
     imageUrl: getImage('kudu-hunt').imageUrl,
     imageHint: getImage('kudu-hunt').imageHint,
-    description: 'A classic Kalahari hunt focusing on the iconic Gemsbok and abundant Springbok. Experience long-range shooting in a breathtaking landscape.'
+    createdAt: new Date('2024-05-10T10:00:00Z'),
   },
   {
     id: '102',
@@ -75,14 +72,13 @@ export const hunts = [
     outfitterName: 'Limpopo Big Game Outfitters',
     title: 'Limpopo Kudu & Impala Hunt',
     species: ['Kudu', 'Impala', 'Warthog'],
-    priceUSD: 5200,
-    priceZAR: Math.round(5200 * ZAR_EXCHANGE_RATE),
+    basePrice: 5200,
+    baseCurrency: 'USD',
+    province: 'Limpopo',
     isVerified: true,
-    duration: '8 Days',
-    type: 'Rifle/Bow',
     imageUrl: getImage('springbok-hunt').imageUrl,
     imageHint: getImage('springbok-hunt').imageHint,
-    description: 'Pursue the legendary "Grey Ghost" of Africa, the Greater Kudu, in the thick bush of the Limpopo valley. A thrilling walk-and-stalk adventure.'
+    createdAt: new Date('2024-05-12T10:00:00Z'),
   },
   {
     id: '103',
@@ -90,14 +86,13 @@ export const hunts = [
     outfitterName: 'Kalahari Precision Safaris',
     title: 'Desert Predator Hunt',
     species: ['Black-backed Jackal', 'Caracal'],
-    priceUSD: 3800,
-    priceZAR: Math.round(3800 * ZAR_EXCHANGE_RATE),
+    basePrice: 3800,
+    baseCurrency: 'USD',
+    province: 'Northern Cape',
     isVerified: false,
-    duration: '5 Days',
-    type: 'Rifle',
     imageUrl: getImage('wildebeest-hunt').imageUrl,
     imageHint: getImage('wildebeest-hunt').imageHint,
-    description: 'A specialized hunt focusing on the elusive predators of the Kalahari. Primarily conducted at night, this is a hunt for the patient and skilled marksman.'
+    createdAt: new Date('2024-04-20T10:00:00Z'),
   },
   {
     id: '104',
@@ -105,14 +100,13 @@ export const hunts = [
     outfitterName: 'Eastern Cape Highlands Hunts',
     title: 'Eastern Cape Spiral Horn Slam',
     species: ['Cape Bushbuck', 'Kudu', 'Eland'],
-    priceUSD: 8500,
-    priceZAR: Math.round(8500 * ZAR_EXCHANGE_RATE),
+    basePrice: 8500,
+    baseCurrency: 'USD',
+    province: 'Eastern Cape',
     isVerified: true,
-    duration: '10 Days',
-    type: 'Rifle',
     imageUrl: getImage('impala-hunt').imageUrl,
     imageHint: getImage('impala-hunt').imageHint,
-    description: 'A challenging hunt across varied terrain for three of Africa\'s most beautiful spiral-horned antelope. A true collector\'s safari.'
+    createdAt: new Date('2024-04-15T10:00:00Z'),
   },
 ];
 

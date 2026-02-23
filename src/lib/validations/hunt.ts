@@ -10,6 +10,7 @@ export const HuntSchema = z.object({
   species: z.array(z.string()),
   province: z.enum(['Limpopo', 'Eastern Cape', 'North West', 'Free State', 'Mpumalanga', 'Northern Cape', 'KwaZulu-Natal']),
   imageUrl: z.string().url(),
+  imageHint: z.string().optional(),
   isVerified: z.boolean().default(false),
   createdAt: z.any(),
 });

@@ -3,15 +3,36 @@ import Link from 'next/link';
 import { ShieldCheck } from 'lucide-react';
 import { Hunt } from '@/lib/validations/hunt';
 
+// This is a simplification for the prototype. In a real app,
+// this would come from an API.
+const USD_TO_ZAR_RATE = 18.5;
+
 interface HuntProps {
   hunt: Hunt;
+  currency: 'USD' | 'ZAR';
 }
 
-export function HuntCard({ hunt }: HuntProps) {
+export function HuntCard({ hunt, currency }: HuntProps) {
+  let displayPrice = hunt.basePrice;
+  let displayCurrency = hunt.baseCurrency;
+
+  // Convert price if the requested currency is different from the base currency
+  if (currency !== hunt.baseCurrency) {
+    if (hunt.baseCurrency === 'USD' && currency === 'ZAR') {
+      displayPrice = hunt.basePrice * USD_TO_ZAR_RATE;
+      displayCurrency = 'ZAR';
+    } else if (hunt.baseCurrency === 'ZAR' && currency === 'USD') {
+      displayPrice = hunt.basePrice / USD_TO_ZAR_RATE;
+      displayCurrency = 'USD';
+    }
+    // Note: No conversion for EUR is implemented in this example.
+    // If base is EUR, it will just display in EUR.
+  }
+
   const price = new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: hunt.baseCurrency,
-  }).format(hunt.basePrice);
+    currency: displayCurrency,
+  }).format(displayPrice);
 
   return (
     <article className="group flex flex-col overflow-hidden rounded-lg border bg-card shadow-sm transition-shadow duration-300 hover:shadow-lg h-full">
@@ -23,7 +44,7 @@ export function HuntCard({ hunt }: HuntProps) {
           className="object-cover transition-transform duration-300 group-hover:scale-105"
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           priority={false}
-          data-ai-hint={hunt.imageUrl}
+          data-ai-hint={hunt.imageHint}
         />
         {hunt.isVerified && (
           <div className="absolute top-3 left-3 flex items-center gap-1 rounded-full bg-primary px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-primary-foreground">
