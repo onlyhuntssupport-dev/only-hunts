@@ -46,7 +46,6 @@ export async function verifyOutfitter(outfitterUid: string) {
     revalidatePath('/hunts');
     return { success: true };
   } catch (error) {
-    console.error("Verification failed:", error);
     return { success: false, error: "Verification failed." };
   }
 }
