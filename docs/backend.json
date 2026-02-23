@@ -25,6 +25,11 @@
           "format": "date-time",
           "description": "The timestamp when the user profile was created."
         },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The timestamp when the user profile was last updated."
+        },
         "role": {
           "type": "string",
           "enum": [
