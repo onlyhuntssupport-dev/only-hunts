@@ -1,3 +1,82 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "hero-savanna",
+      "description": "A sweeping view of the African savanna at sunrise.",
+      "imageUrl": "https://images.unsplash.com/photo-1618686769343-d1d29bcb620f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxzYXZhbm5hJTIwbGFuZHNjYXBlfGVufDB8fHx8MTc3MTg2NjY0OXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "savanna landscape"
+    },
+    {
+      "id": "kudu-hunt",
+      "description": "A majestic Kudu bull in the bushveld.",
+      "imageUrl": "https://images.unsplash.com/photo-1756024734616-4fc4693db640?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8a3VkdSUyMGJ1Y2t8ZW58MHx8fHwxNzcxODY2NjQ5fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "kudu buck"
+    },
+    {
+      "id": "springbok-hunt",
+      "description": "A herd of springboks grazing on a plain.",
+      "imageUrl": "https://images.unsplash.com/photo-1580153417237-24ddc7e9f192?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxzcHJpbmdib2slMjBoZXJkfGVufDB8fHx8MTc3MTg2NjY0OXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "springbok herd"
+    },
+    {
+      "id": "wildebeest-hunt",
+      "description": "A large wildebeest stands in the tall grass.",
+      "imageUrl": "https://images.unsplash.com/photo-1683530090979-006f5d7a5c15?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHx3aWxkZWJlZXN0JTIwbWFsZXxlbnwwfHx8fDE3NzE4NjY2NDl8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "wildebeest male"
+    },
+    {
+      "id": "impala-hunt",
+      "description": "An Impala ram stands alert in the shade.",
+      "imageUrl": "https://images.unsplash.com/photo-1719342644620-130dcb2f9415?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxpbXBhbGElMjByYW18ZW58MHx8fHwxNzcxODY2NjQ5fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "impala ram"
+    },
+    {
+      "id": "outfitter-camp",
+      "description": "A luxurious safari tent camp at dusk.",
+      "imageUrl": "https://images.unsplash.com/photo-1632315152441-465a943cc211?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxzYWZhcmklMjBjYW1wfGVufDB8fHx8MTc3MTg2NjY0OXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "safari camp"
+    },
+    {
+      "id": "hunter-profile-avatar",
+      "description": "A person in safari gear looking out over the landscape.",
+      "imageUrl": "https://images.unsplash.com/photo-1742201514132-8b4f51fcdc0c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxodW50ZXIlMjBwb3J0cmFpdHxlbnwwfHx8fDE3NzE4NjY2NDl8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "hunter portrait"
+    },
+    {
+      "id": "outfitter-gallery-1",
+      "description": "A 4x4 vehicle on a dirt road in the savanna.",
+      "imageUrl": "https://images.unsplash.com/photo-1671548884578-0a6762663803?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxzYWZhcmklMjB2ZWhpY2xlfGVufDB8fHx8MTc3MTg2NjY0OXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "safari vehicle"
+    },
+    {
+      "id": "outfitter-gallery-2",
+      "description": "A campfire under the stars at a safari lodge.",
+      "imageUrl": "https://images.unsplash.com/photo-1755554259222-08ec71b07f56?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxzYWZhcmklMjBjYW1wZmlyZXxlbnwwfHx8fDE3NzE4NjY2NDl8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "safari campfire"
+    },
+    {
+      "id": "outfitter-gallery-3",
+      "description": "A close-up of a high-powered hunting rifle.",
+      "imageUrl": "https://images.unsplash.com/photo-1615226661904-a5ea74800579?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxodW50aW5nJTIwcmlmbGV8ZW58MHx8fHwxNzcxODY2NjQ5fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "hunting rifle"
+    },
+    {
+      "id": "how-it-works-1",
+      "description": "A person searching on a laptop.",
+      "imageUrl": "https://images.unsplash.com/photo-1733382077772-d7d0d86079e1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxsYXB0b3AlMjBzZWFyY2h8ZW58MHx8fHwxNzcxODY2NjQ5fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "laptop search"
+    },
+    {
+      "id": "how-it-works-2",
+      "description": "Two people shaking hands in agreement.",
+      "imageUrl": "https://images.unsplash.com/photo-1758599543152-a73184816eba?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxoYW5kc2hha2UlMjBkZWFsfGVufDB8fHx8MTc3MTg2MDI4N3ww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "handshake deal"
+    },
+    {
+      "id": "how-it-works-3",
+      "description": "A person on a memorable adventure.",
+      "imageUrl": "https://images.unsplash.com/photo-1501761095094-94d36f57edbb?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxhZHZlbnR1cmUlMjB0cmF2ZWx8ZW58MHx8fHwxNzcxODY2NjQ5fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "adventure travel"
+    }
+  ]
 }
