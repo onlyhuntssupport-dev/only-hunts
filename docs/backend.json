@@ -38,6 +38,15 @@
             "ADMIN"
           ],
           "description": "The user's role in the application."
+        },
+        "isVerified": {
+          "type": "boolean",
+          "description": "Indicates if the outfitter's profile has been verified by an admin."
+        },
+        "verifiedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The timestamp when the outfitter was verified."
         }
       },
       "required": [
