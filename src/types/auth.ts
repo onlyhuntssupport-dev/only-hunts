@@ -1,3 +1,4 @@
+
 export type UserRole = 'HUNTER' | 'OUTFITTER' | 'ADMIN';
 
 export interface AppUser {
