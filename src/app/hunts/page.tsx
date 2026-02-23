@@ -1,6 +1,6 @@
-import { hunts, outfitters } from '@/lib/data';
-import { HuntCard } from '@/components/marketplace/HuntCard';
 import FilterSidebar from '@/components/marketplace/FilterSidebar';
+import { HuntCard } from '@/components/marketplace/HuntCard';
+import { getHunts } from '@/lib/firebase/queries';
 
 interface PageProps {
   searchParams: { 
@@ -9,19 +9,11 @@ interface PageProps {
   };
 }
 
-export default function HuntsPage({ searchParams }: PageProps) {
+export default async function HuntsPage({ searchParams }: PageProps) {
   const provinceFilters = searchParams.province?.split(',') || [];
   const speciesFilters = searchParams.species?.split(',') || [];
 
-  const filteredHunts = hunts.filter(hunt => {
-    const outfitter = outfitters.find(o => o.id === hunt.outfitterId);
-    if (!outfitter) return false;
-
-    const provinceMatch = provinceFilters.length === 0 || provinceFilters.some(pf => outfitter.location.includes(pf));
-    const speciesMatch = speciesFilters.length === 0 || speciesFilters.some(sf => hunt.species.some(hs => hs === sf));
-
-    return provinceMatch && speciesMatch;
-  });
+  const hunts = await getHunts({ provinces: provinceFilters, species: speciesFilters });
 
   return (
     <div className="container mx-auto max-w-7xl py-8">
@@ -36,15 +28,15 @@ export default function HuntsPage({ searchParams }: PageProps) {
         <FilterSidebar />
         
         <main className="flex-1">
-          {filteredHunts.length === 0 ? (
+          {hunts.length === 0 ? (
             <div className="text-center py-12 bg-card border rounded-lg">
               <h3 className="text-xl font-headline font-bold">No hunts found.</h3>
               <p className="text-muted-foreground mt-2">Try adjusting your filters.</p>
             </div>
           ) : (
              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-              {filteredHunts.map((hunt) => (
-                <HuntCard key={hunt.id} hunt={hunt} currency="USD" />
+              {hunts.map((hunt) => (
+                <HuntCard key={hunt.id} hunt={hunt} />
               ))}
             </div>
           )}

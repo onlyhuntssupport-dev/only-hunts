@@ -3,9 +3,10 @@ import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
+import { Hunt } from '@/lib/validations/hunt';
 
 export default function HuntPage({ params }: { params: { id: string } }) {
-  const hunt = hunts.find(h => h.id === params.id);
+  const hunt = hunts.find(h => h.id === params.id) as unknown as Hunt | undefined;
 
   if (!hunt) {
     notFound();
@@ -21,7 +22,6 @@ export default function HuntPage({ params }: { params: { id: string } }) {
           alt={hunt.title}
           fill
           className="object-cover"
-          data-ai-hint={hunt.imageHint}
           priority
         />
       </div>
@@ -42,10 +42,10 @@ export default function HuntPage({ params }: { params: { id: string } }) {
 
       <div className="mt-8 border-t pt-8">
         <div className="prose prose-lg max-w-none text-muted-foreground">
-            <p>{hunt.description}</p>
+            {/* <p>{hunt.description}</p> */}
             <ul>
-                <li><strong>Duration:</strong> {hunt.duration}</li>
-                <li><strong>Hunt Type:</strong> {hunt.type}</li>
+                {/* <li><strong>Duration:</strong> {hunt.duration}</li> */}
+                {/* <li><strong>Hunt Type:</strong> {hunt.type}</li> */}
             </ul>
         </div>
       </div>

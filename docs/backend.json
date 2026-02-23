@@ -1,0 +1,117 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Represents a user's profile in the application.",
+      "type": "object",
+      "properties": {
+        "displayName": {
+          "type": "string",
+          "description": "The user's display name."
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "The user's email address."
+        },
+        "photoURL": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL of the user's profile picture."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The timestamp when the user profile was created."
+        }
+      },
+      "required": ["displayName", "email"]
+    },
+    "Hunt": {
+      "title": "Hunt",
+      "description": "Represents a hunt package.",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "outfitterId": {
+          "type": "string"
+        },
+        "outfitterName": {
+          "type": "string"
+        },
+        "basePrice": {
+          "type": "number"
+        },
+        "baseCurrency": {
+          "type": "string",
+          "enum": [
+            "USD",
+            "EUR",
+            "ZAR"
+          ]
+        },
+        "species": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "province": {
+          "type": "string",
+          "enum": [
+            "Limpopo",
+            "Eastern Cape",
+            "North West",
+            "Free State",
+            "Mpumalanga",
+            "Northern Cape",
+            "KwaZulu-Natal"
+          ]
+        },
+        "imageUrl": {
+          "type": "string",
+          "format": "uri"
+        },
+        "isVerified": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "title",
+        "outfitterId",
+        "outfitterName",
+        "basePrice",
+        "baseCurrency",
+        "species",
+        "province",
+        "imageUrl",
+        "createdAt"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/UserProfile"
+      },
+      "description": "Stores user profile information."
+    },
+    "/hunts/{huntId}": {
+      "schema": {
+        "$ref": "#/entities/Hunt"
+      },
+      "description": "Stores individual hunt packages."
+    }
+  }
+}
