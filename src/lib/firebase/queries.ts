@@ -29,14 +29,12 @@ export async function getHunts({
     const { firestore: db } = initializeFirebase();
     const huntsRef = collection(db, 'hunts').withConverter(huntConverter);
     
-    // Firestore queries are limited. We can't use 'in' and 'array-contains-any' on different fields.
-    // We'll query by province first (if present), then filter by species in memory.
     let q = query(huntsRef, orderBy('createdAt', 'desc'));
 
     if (provinces.length > 0) {
       q = query(q, where('province', 'in', provinces));
     }
-
+    
     const querySnapshot = await getDocs(q);
     let hunts = querySnapshot.docs.map(doc => doc.data());
 
@@ -50,8 +48,6 @@ export async function getHunts({
 
   } catch (error) {
     console.error("Error fetching hunts:", error);
-    // In a production app, you'd want more robust error handling.
-    // For now, return an empty array to prevent the page from crashing.
     return [];
   }
 }
