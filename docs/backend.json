@@ -23,9 +23,22 @@
           "type": "string",
           "format": "date-time",
           "description": "The timestamp when the user profile was created."
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "HUNTER",
+            "OUTFITTER",
+            "ADMIN"
+          ],
+          "description": "The user's role in the application."
         }
       },
-      "required": ["displayName", "email"]
+      "required": [
+        "displayName",
+        "email",
+        "role"
+      ]
     },
     "Hunt": {
       "title": "Hunt",
@@ -97,7 +110,8 @@
   },
   "auth": {
     "providers": [
-      "anonymous"
+      "google.com",
+      "password"
     ]
   },
   "firestore": {
