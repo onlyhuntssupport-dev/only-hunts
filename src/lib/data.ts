@@ -51,52 +51,71 @@ export const outfitters = [
   },
 ];
 
+const ZAR_EXCHANGE_RATE = 18.5;
+
 export const hunts = [
   {
     id: '101',
     outfitterId: '1',
+    outfitterName: 'Kalahari Precision Safaris',
     title: 'Kalahari Gemsbok & Springbok Package',
     species: ['Gemsbok', 'Springbok'],
-    price: 4500,
+    priceUSD: 4500,
+    priceZAR: Math.round(4500 * ZAR_EXCHANGE_RATE),
+    isVerified: true,
     duration: '7 Days',
     type: 'Rifle',
-    image: getImage('kudu-hunt'),
+    imageUrl: getImage('kudu-hunt').imageUrl,
+    imageHint: getImage('kudu-hunt').imageHint,
     description: 'A classic Kalahari hunt focusing on the iconic Gemsbok and abundant Springbok. Experience long-range shooting in a breathtaking landscape.'
   },
   {
     id: '102',
     outfitterId: '2',
+    outfitterName: 'Limpopo Big Game Outfitters',
     title: 'Limpopo Kudu & Impala Hunt',
     species: ['Kudu', 'Impala', 'Warthog'],
-    price: 5200,
+    priceUSD: 5200,
+    priceZAR: Math.round(5200 * ZAR_EXCHANGE_RATE),
+    isVerified: true,
     duration: '8 Days',
     type: 'Rifle/Bow',
-    image: getImage('springbok-hunt'),
+    imageUrl: getImage('springbok-hunt').imageUrl,
+    imageHint: getImage('springbok-hunt').imageHint,
     description: 'Pursue the legendary "Grey Ghost" of Africa, the Greater Kudu, in the thick bush of the Limpopo valley. A thrilling walk-and-stalk adventure.'
   },
   {
     id: '103',
     outfitterId: '1',
+    outfitterName: 'Kalahari Precision Safaris',
     title: 'Desert Predator Hunt',
     species: ['Black-backed Jackal', 'Caracal'],
-    price: 3800,
+    priceUSD: 3800,
+    priceZAR: Math.round(3800 * ZAR_EXCHANGE_RATE),
+    isVerified: false,
     duration: '5 Days',
     type: 'Rifle',
-    image: getImage('wildebeest-hunt'),
+    imageUrl: getImage('wildebeest-hunt').imageUrl,
+    imageHint: getImage('wildebeest-hunt').imageHint,
     description: 'A specialized hunt focusing on the elusive predators of the Kalahari. Primarily conducted at night, this is a hunt for the patient and skilled marksman.'
   },
   {
     id: '104',
     outfitterId: '3',
+    outfitterName: 'Eastern Cape Highlands Hunts',
     title: 'Eastern Cape Spiral Horn Slam',
     species: ['Cape Bushbuck', 'Kudu', 'Eland'],
-    price: 8500,
+    priceUSD: 8500,
+    priceZAR: Math.round(8500 * ZAR_EXCHANGE_RATE),
+    isVerified: true,
     duration: '10 Days',
     type: 'Rifle',
-    image: getImage('impala-hunt'),
+    imageUrl: getImage('impala-hunt').imageUrl,
+    imageHint: getImage('impala-hunt').imageHint,
     description: 'A challenging hunt across varied terrain for three of Africa\'s most beautiful spiral-horned antelope. A true collector\'s safari.'
   },
 ];
+
 
 export const reviews = [
   {

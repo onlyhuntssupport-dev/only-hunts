@@ -1,60 +1,64 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ArrowRight, Calendar, DollarSign, Tag } from 'lucide-react';
-import type { hunts as HuntType } from '@/lib/data';
+import { ShieldCheck } from 'lucide-react';
 
-type HuntCardProps = {
-  hunt: (typeof HuntType)[0];
-};
+interface HuntProps {
+  hunt: {
+    id: string;
+    title: string;
+    outfitterName: string;
+    priceUSD: number;
+    priceZAR: number;
+    species: string[];
+    imageUrl: string;
+    imageHint: string;
+    isVerified: boolean;
+  };
+  currency: 'USD' | 'ZAR';
+}
 
-export function HuntCard({ hunt }: HuntCardProps) {
+export function HuntCard({ hunt, currency }: HuntProps) {
+  const price = currency === 'USD' ? `$${hunt.priceUSD.toLocaleString()}` : `R${hunt.priceZAR.toLocaleString()}`;
+
   return (
-    <Card className="flex flex-col overflow-hidden h-full shadow-md hover:shadow-xl transition-shadow duration-300">
-      <CardHeader className="p-0">
-        <div className="relative h-48 w-full">
-          <Image
-            src={hunt.image.imageUrl}
-            alt={hunt.title}
-            fill
-            className="object-cover"
-            data-ai-hint={hunt.image.imageHint}
-          />
+    <article className="group flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-off-white shadow-sm transition-shadow duration-300 hover:shadow-md h-full">
+      <div className="relative aspect-[16/9] w-full overflow-hidden">
+        <Image
+          src={hunt.imageUrl}
+          alt={hunt.title}
+          fill
+          className="object-cover transition-transform duration-300 group-hover:scale-105"
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+          priority={false}
+          data-ai-hint={hunt.imageHint}
+        />
+        {hunt.isVerified && (
+          <div className="absolute top-3 left-3 flex items-center gap-1 rounded-full bg-olive px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white">
+            <ShieldCheck size={12} />
+            Verified
+          </div>
+        )}
+      </div>
+
+      <div className="p-4 flex flex-col flex-grow">
+        <h3 className="text-lg font-bold text-olive">{hunt.title}</h3>
+        <p className="text-sm text-slate-500">{hunt.outfitterName}</p>
+        
+        <div className="mt-3 flex flex-wrap gap-2">
+          {hunt.species.map((s) => (
+            <span key={s} className="rounded bg-kalahari/20 px-2 py-0.5 text-xs font-medium text-olive">
+              {s}
+            </span>
+          ))}
         </div>
-        <div className="p-4">
-            <CardTitle className="font-headline text-xl mb-2">{hunt.title}</CardTitle>
-            <div className="flex flex-wrap gap-2">
-                {hunt.species.map((s) => (
-                    <Badge key={s} variant="secondary">{s}</Badge>
-                ))}
-            </div>
-        </div>
-      </CardHeader>
-      <CardContent className="flex-grow p-4 pt-0">
-        <div className="text-muted-foreground space-y-2 text-sm">
-            <div className="flex items-center gap-2">
-                <DollarSign className="h-4 w-4 text-primary"/>
-                <span>${hunt.price}</span>
-            </div>
-            <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-primary"/>
-                <span>{hunt.duration}</span>
-            </div>
-            <div className="flex items-center gap-2">
-                <Tag className="h-4 w-4 text-primary"/>
-                <span>{hunt.type} Hunt</span>
-            </div>
-        </div>
-      </CardContent>
-      <CardFooter className="p-4 pt-0">
-        <Button asChild className="w-full">
-          <Link href={`/hunts/${hunt.id}`}>
-            View Hunt <ArrowRight className="ml-2 h-4 w-4" />
+
+        <div className="mt-auto pt-4 flex items-center justify-between border-t border-gray-100 mt-4">
+          <span className="text-xl font-bold text-olive">{price}</span>
+           <Link href={`/hunts/${hunt.id}`} className="rounded-md bg-olive px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-opacity-90">
+            View Details
           </Link>
-        </Button>
-      </CardFooter>
-    </Card>
+        </div>
+      </div>
+    </article>
   );
 }

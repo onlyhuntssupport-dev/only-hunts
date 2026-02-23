@@ -62,6 +62,9 @@ export default {
           '4': 'hsl(var(--chart-4))',
           '5': 'hsl(var(--chart-5))',
         },
+        'olive': '#3d441e',
+        'kalahari': '#d1b280',
+        'off-white': '#fcfaf7',
       },
       borderRadius: {
         lg: 'var(--radius)',

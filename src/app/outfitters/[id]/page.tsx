@@ -61,7 +61,7 @@ export default function OutfitterPage({ params }: { params: { id: string } }) {
             <div className="mt-8">
                 <h2 className="font-headline text-3xl font-bold mb-4">Hunt Packages</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {outfitterHunts.map(hunt => <HuntCard key={hunt.id} hunt={hunt} />)}
+                    {outfitterHunts.map(hunt => <HuntCard key={hunt.id} hunt={hunt} currency="USD" />)}
                 </div>
             </div>
 

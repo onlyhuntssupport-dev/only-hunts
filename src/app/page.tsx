@@ -70,7 +70,7 @@ export default function Home() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {hunts.slice(0, 4).map(hunt => (
-              <HuntCard key={hunt.id} hunt={hunt} />
+              <HuntCard key={hunt.id} hunt={hunt} currency="USD" />
             ))}
           </div>
           <div className="text-center mt-12">

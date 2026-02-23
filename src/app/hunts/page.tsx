@@ -91,7 +91,7 @@ export default function HuntsPage() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {hunts.map(hunt => (
-                <HuntCard key={hunt.id} hunt={hunt} />
+                <HuntCard key={hunt.id} hunt={hunt} currency="USD" />
                 ))}
             </div>
             <div className="mt-8 text-center">
