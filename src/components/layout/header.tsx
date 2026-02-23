@@ -15,10 +15,18 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Logo } from '@/components/icons';
 import { useState } from 'react';
 
-const navLinks = [
-  { href: '/hunts', label: 'Find a Hunt' },
-  { href: '#', label: 'Outfitters' },
-  { href: '#', label: 'About Us' },
+interface NavLink {
+  id: string;
+  label: string;
+  href: string;
+}
+
+const navLinks: NavLink[] = [
+  { id: 'nav-home', label: 'Home', href: '/' },
+  { id: 'nav-hunts', label: 'Explore Hunts', href: '/hunts' },
+  { id: 'nav-outfitters', label: 'Outfitters', href: '/outfitters' },
+  { id: 'nav-contact', label: 'Contact', href: '#' },
+  { id: 'nav-faq', label: 'FAQ', href: '#' },
 ];
 
 export function Header() {
@@ -34,7 +42,7 @@ export function Header() {
           <nav className="flex items-center gap-6 text-sm">
             {navLinks.map((link) => (
               <Link
-                key={link.href}
+                key={link.id}
                 href={link.href}
                 className="transition-colors hover:text-foreground/80 text-foreground/60"
               >
@@ -60,7 +68,7 @@ export function Header() {
                 <div className="flex flex-col gap-4 py-4">
                   {navLinks.map((link) => (
                     <Link
-                      key={link.href}
+                      key={link.id}
                       href={link.href}
                       className="text-foreground"
                     >
