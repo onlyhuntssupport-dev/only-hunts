@@ -2,12 +2,12 @@ import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import { adminDb } from '@/lib/firebase/admin';
-import { ShieldCheck, MapPin, Target, MessageSquare } from 'lucide-react';
+import { ShieldCheck, MapPin, Target } from 'lucide-react';
 import { Hunt, HuntSchema } from '@/lib/validations/hunt';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { InquiryForm } from '@/components/marketplace/InquiryForm';
 
 interface Props {
   params: { id: string };
@@ -98,10 +98,7 @@ export default async function HuntDetailPage({ params }: Props) {
                   Offered by: <Link href={`/outfitters/${hunt.outfitterId}`} className="font-bold text-primary hover:underline">{hunt.outfitterName}</Link>
                 </p>
 
-                <Button size="lg" className="w-full">
-                    <MessageSquare className="mr-2" />
-                    Contact Outfitter
-                </Button>
+                <InquiryForm hunt={hunt} />
             </CardContent>
           </Card>
         </div>

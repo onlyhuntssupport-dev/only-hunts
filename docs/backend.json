@@ -108,6 +108,10 @@
         "createdAt": {
           "type": "string",
           "format": "date-time"
+        },
+        "leadCount": {
+          "type": "number",
+          "description": "Number of inquiries for this hunt."
         }
       },
       "required": [
@@ -120,6 +124,63 @@
         "province",
         "imageUrl",
         "createdAt"
+      ]
+    },
+    "Inquiry": {
+      "title": "Inquiry",
+      "description": "Represents a user inquiry about a hunt.",
+      "type": "object",
+      "properties": {
+        "huntId": {
+          "type": "string"
+        },
+        "huntTitle": {
+          "type": "string"
+        },
+        "outfitterId": {
+          "type": "string"
+        },
+        "hunterId": {
+          "type": "string"
+        },
+        "hunterName": {
+          "type": "string"
+        },
+        "hunterEmail": {
+          "type": "string",
+          "format": "email"
+        },
+        "message": {
+          "type": "string"
+        },
+        "preferredDate": {
+          "type": "string",
+          "format": "date"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "new",
+            "responded",
+            "booked",
+            "archived"
+          ]
+        }
+      },
+      "required": [
+        "huntId",
+        "huntTitle",
+        "outfitterId",
+        "hunterId",
+        "hunterName",
+        "hunterEmail",
+        "message",
+        "createdAt",
+        "status"
       ]
     }
   },
@@ -141,6 +202,12 @@
         "$ref": "#/entities/Hunt"
       },
       "description": "Stores individual hunt packages."
+    },
+    "/inquiries/{inquiryId}": {
+      "schema": {
+        "$ref": "#/entities/Inquiry"
+      },
+      "description": "Stores inquiries made by hunters."
     }
   }
 }

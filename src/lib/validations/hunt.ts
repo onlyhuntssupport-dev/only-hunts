@@ -13,6 +13,7 @@ export const HuntSchema = z.object({
   imageHint: z.string().optional(),
   isVerified: z.boolean().default(false),
   createdAt: z.any(),
+  leadCount: z.number().optional(),
 });
 
 export type Hunt = z.infer<typeof HuntSchema>;
