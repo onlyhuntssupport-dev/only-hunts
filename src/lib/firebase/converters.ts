@@ -4,25 +4,32 @@ import { Hunt, HuntSchema } from '../validations/hunt';
 
 export const huntConverter: FirestoreDataConverter<Hunt> = {
   toFirestore: (hunt: Hunt) => {
-    // If createdAt is a Date object, convert it to a Firestore Timestamp
-    if (hunt.createdAt instanceof Date) {
-      return { ...hunt, createdAt: Timestamp.fromDate(hunt.createdAt) };
+    const data: any = { ...hunt };
+    
+    // Convert Date objects to Firestore Timestamps before sending
+    if (data.createdAt instanceof Date) {
+      data.createdAt = Timestamp.fromDate(data.createdAt);
     }
-    return hunt;
+    if (data.approvedAt instanceof Date) {
+        data.approvedAt = Timestamp.fromDate(data.approvedAt);
+    }
+    return data;
   },
   fromFirestore: (snapshot: QueryDocumentSnapshot): Hunt => {
     const data = snapshot.data();
     
-    // Convert Firestore Timestamp to JS Date object
-    const createdAt = data.createdAt instanceof Timestamp 
-        ? data.createdAt.toDate().toISOString() 
-        : data.createdAt;
+    // Convert Firestore Timestamps to JS Date objects
+    const convertedData = { ...data };
+    for (const key of ['createdAt', 'approvedAt']) {
+        if (data[key] instanceof Timestamp) {
+            convertedData[key] = data[key].toDate();
+        }
+    }
 
     // Use Zod to parse and validate the data
     const parsed = HuntSchema.safeParse({ 
-        ...data, 
+        ...convertedData, 
         id: snapshot.id,
-        createdAt: createdAt
     });
 
     if (!parsed.success) {

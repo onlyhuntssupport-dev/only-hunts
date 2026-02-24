@@ -1,3 +1,4 @@
+
 import { z } from 'zod';
 
 export const HuntSchema = z.object({
@@ -14,6 +15,8 @@ export const HuntSchema = z.object({
   isVerified: z.boolean().default(false),
   createdAt: z.any(),
   leadCount: z.number().optional(),
+  status: z.enum(['pending', 'active', 'rejected']).default('pending'),
+  approvedAt: z.any().optional(),
 });
 
 export type Hunt = z.infer<typeof HuntSchema>;

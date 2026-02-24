@@ -1,3 +1,4 @@
+
 'use server';
 
 import { adminDb } from '@/lib/firebase/admin';
@@ -6,7 +7,14 @@ import { Hunt, HuntSchema } from '@/lib/validations/hunt';
 import { z } from 'zod';
 
 // We don't want the client sending these fields, as they are controlled by the server.
-const HuntCreationData = HuntSchema.omit({ id: true, isVerified: true });
+const HuntCreationData = HuntSchema.omit({ 
+    id: true, 
+    isVerified: true, 
+    status: true, 
+    approvedAt: true,
+    createdAt: true,
+    leadCount: true,
+});
 
 export async function createHunt(data: z.infer<typeof HuntCreationData>) {
   try {
@@ -14,9 +22,10 @@ export async function createHunt(data: z.infer<typeof HuntCreationData>) {
 
     const docRef = await adminDb.collection('hunts').add({
       ...validatedData,
-      // Overwrite client-side timestamp with a secure server-side one
       createdAt: new Date(), 
-      isVerified: false, // Ensure all new hunts start as unverified
+      isVerified: false, // Outfitter verification status cascades separately
+      status: 'pending', // All new hunts require admin approval
+      leadCount: 0,
     });
 
     revalidatePath('/hunts');

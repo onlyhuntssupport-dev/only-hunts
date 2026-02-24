@@ -1,13 +1,15 @@
+
 import { redirect } from 'next/navigation';
 import { adminAuth } from '@/lib/firebase/admin';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
-import { ShieldCheck, Users, LayoutDashboard } from 'lucide-react';
+import { ShieldCheck, Users, LayoutDashboard, ClipboardCheck } from 'lucide-react';
 import { Logo } from '@/components/icons';
 
 const navLinks = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/verifications', label: 'Verifications', icon: ShieldCheck },
+  { href: '/admin/approvals', label: 'Hunt Approvals', icon: ClipboardCheck },
   { href: '/admin/staff', label: 'Staff Management', icon: Users },
 ];
 

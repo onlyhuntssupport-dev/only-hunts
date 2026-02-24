@@ -1,3 +1,4 @@
+
 'use server';
 
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
@@ -49,3 +50,21 @@ export async function verifyOutfitter(outfitterUid: string) {
     return { success: false, error: "Verification failed." };
   }
 }
+
+/**
+ * Approves a pending hunt listing.
+ */
+export async function approveHuntListing(huntId: string) {
+    try {
+      await adminDb.collection('hunts').doc(huntId).update({
+        status: 'active',
+        approvedAt: new Date().toISOString(),
+      });
+      revalidatePath('/admin/approvals');
+      revalidatePath('/hunts');
+      return { success: true };
+    } catch (error) {
+      console.error("Failed to approve hunt:", error);
+      return { success: false, error: "Approval failed." };
+    }
+  }

@@ -112,6 +112,20 @@
         "leadCount": {
           "type": "number",
           "description": "Number of inquiries for this hunt."
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "active",
+            "rejected"
+          ],
+          "description": "The approval status of the hunt listing."
+        },
+        "approvedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The timestamp when the hunt was approved."
         }
       },
       "required": [

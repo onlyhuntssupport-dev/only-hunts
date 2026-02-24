@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -75,13 +76,12 @@ export default function HuntCreator({ outfitterId, outfitterName }: { outfitterI
       const finalHuntData = {
         ...formData,
         imageUrl,
-        createdAt: new Date().toISOString(),
       };
 
       const result = await createHunt(finalHuntData);
 
       if (result.success) {
-        toast({ title: 'Hunt Published!', description: `${finalHuntData.title} is now live.` });
+        toast({ title: 'Hunt Submitted!', description: `${finalHuntData.title} is now pending approval.` });
         router.push('/outfitter/dashboard');
         router.refresh();
       } else {
@@ -214,7 +214,7 @@ export default function HuntCreator({ outfitterId, outfitterName }: { outfitterI
                     className="w-full"
                 >
                     {isPublishing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    {isPublishing ? 'Publishing...' : 'Publish Hunt Package'}
+                    {isPublishing ? 'Submitting...' : 'Submit for Approval'}
                 </Button>
             </div>
         )}

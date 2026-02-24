@@ -28,9 +28,10 @@ export async function getHunts({
   try {
     const huntsRef = collection(adminDb, 'hunts').withConverter(huntConverter);
     
-    // Base query only fetching verified hunts
-    const queryConstraints = [
+    // Base query only fetching verified and active hunts
+    const queryConstraints: any[] = [
         where('isVerified', '==', true),
+        where('status', '==', 'active'),
         orderBy('createdAt', 'desc'),
     ];
 
