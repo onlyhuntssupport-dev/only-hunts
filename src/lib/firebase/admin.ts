@@ -14,10 +14,8 @@ const formatPrivateKey = (key: string) => {
 };
 
 const getAdminApp = () => {
-  if (admin.apps.length > 0) {
-    const app = admin.apps[0];
-    if(app) return app;
-  };
+  const app = admin.apps.find(a => a);
+  if (app) return app;
 
   const projectId = process.env.FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
