@@ -1,52 +1,109 @@
-import { hunts, outfitters } from '@/lib/data';
+import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
+import { adminDb } from '@/lib/firebase/admin';
+import { ShieldCheck, MapPin, Target, MessageSquare } from 'lucide-react';
+import { Hunt, HuntSchema } from '@/lib/validations/hunt';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { Hunt } from '@/lib/validations/hunt';
 
-export default function HuntPage({ params }: { params: { id: string } }) {
-  const hunt = hunts.find(h => h.id === params.id) as unknown as Hunt | undefined;
+interface Props {
+  params: { id: string };
+}
 
-  if (!hunt) {
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const doc = await adminDb.collection('hunts').doc(params.id).get();
+  
+  if (!doc.exists) {
+    return { title: 'Hunt Not Found' };
+  }
+  
+  const hunt = doc.data() as any;
+  
+  return {
+    title: `${hunt.title || 'Untitled Hunt'} | ${hunt.outfitterName || 'OnlyHunts'}`,
+    description: `Book this premium hunting package in ${hunt.province || 'South Africa'} with ${hunt.outfitterName || 'a premier outfitter'}.`,
+    openGraph: {
+      title: hunt.title || 'Untitled Hunt',
+      description: `Premium hunting in ${hunt.province || 'South Africa'}`,
+      images: hunt.imageUrl ? [hunt.imageUrl] : [],
+    },
+  };
+}
+
+export default async function HuntDetailPage({ params }: Props) {
+  const doc = await adminDb.collection('hunts').doc(params.id).get();
+  
+  if (!doc.exists) {
     notFound();
   }
-
-  const outfitter = outfitters.find(o => o.id === hunt.outfitterId);
+  
+  const hunt = HuntSchema.parse({ id: doc.id, ...doc.data() });
 
   return (
-    <div className="container mx-auto max-w-4xl py-12">
-      <div className="relative h-96 w-full rounded-lg overflow-hidden mb-8">
-        <Image
-          src={hunt.imageUrl}
-          alt={hunt.title}
-          fill
+    <div className="container mx-auto max-w-5xl py-12">
+      <div className="relative w-full h-[50vh] md:h-[60vh] rounded-lg overflow-hidden mb-8">
+        <Image 
+          src={hunt.imageUrl} 
+          alt={hunt.title} 
+          fill 
           className="object-cover"
           priority
+          data-ai-hint={hunt.imageHint}
         />
       </div>
-      
-      <h1 className="font-headline text-4xl font-bold">{hunt.title}</h1>
-      
-      {outfitter && (
-        <p className="text-muted-foreground mt-2 text-lg">
-          An adventure by <Link href={`/outfitters/${outfitter.id}`} className="text-primary hover:underline">{outfitter.name}</Link>
-        </p>
-      )}
 
-      <div className="mt-6 flex flex-wrap gap-2">
-        {hunt.species.map((s) => (
-          <Badge key={s} variant="secondary">{s}</Badge>
-        ))}
-      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+        <div className="lg:col-span-2 space-y-8">
+          <div>
+            <h1 className="text-4xl font-bold font-headline text-primary mb-2">{hunt.title}</h1>
+            <div className="flex items-center flex-wrap gap-4 text-muted-foreground">
+              <span className="flex items-center gap-1.5"><MapPin size={16} /> {hunt.province}</span>
+              {hunt.isVerified && (
+                <Badge variant="default" className="gap-1.5">
+                  <ShieldCheck size={14} /> Verified Outfitter
+                </Badge>
+              )}
+            </div>
+          </div>
 
-      <div className="mt-8 border-t pt-8">
-        <div className="prose prose-lg max-w-none text-muted-foreground">
-            {/* <p>{hunt.description}</p> */}
-            <ul>
-                {/* <li><strong>Duration:</strong> {hunt.duration}</li> */}
-                {/* <li><strong>Hunt Type:</strong> {hunt.type}</li> */}
-            </ul>
+          <section>
+            <h2 className="text-2xl font-bold font-headline text-primary mb-4">Included Species</h2>
+            <div className="flex flex-wrap gap-2">
+              {hunt.species?.map((s: string) => (
+                <Badge key={s} variant="secondary" className="text-base font-medium py-1 px-3">
+                  <Target size={16} className="mr-2 text-primary" /> {s}
+                </Badge>
+              ))}
+            </div>
+          </section>
+        </div>
+
+        <div className="lg:col-span-1">
+          <Card className="sticky top-24">
+            <CardContent className="p-6 space-y-6">
+                <div>
+                    <p className="text-sm text-muted-foreground mb-1">Starting from</p>
+                    <p className="text-3xl font-bold text-primary">
+                      {new Intl.NumberFormat('en-US', {
+                        style: 'currency',
+                        currency: hunt.baseCurrency,
+                      }).format(hunt.basePrice)}
+                    </p>
+                </div>
+            
+                <p className="text-sm font-medium">
+                  Offered by: <Link href={`/outfitters/${hunt.outfitterId}`} className="font-bold text-primary hover:underline">{hunt.outfitterName}</Link>
+                </p>
+
+                <Button size="lg" className="w-full">
+                    <MessageSquare className="mr-2" />
+                    Contact Outfitter
+                </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
