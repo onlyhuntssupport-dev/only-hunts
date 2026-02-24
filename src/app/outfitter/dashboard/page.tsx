@@ -69,6 +69,12 @@ export default async function OutfitterDashboard() {
 
   const newInquiriesCount = newInquiriesSnapshot.size;
 
+  const statusConfig = {
+    pending: { variant: 'secondary', label: 'Pending' },
+    active: { variant: 'default', label: 'Active' },
+    rejected: { variant: 'destructive', label: 'Rejected' }
+  } as const;
+
   return (
     <div className="space-y-6 p-4 md:p-8 pt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
       <div className="lg:col-span-2 space-y-6">
@@ -76,7 +82,7 @@ export default async function OutfitterDashboard() {
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle>My Hunt Packages</CardTitle>
-              <CardDescription>Manage your active listings and pricing.</CardDescription>
+              <CardDescription>Manage your active listings and view analytics.</CardDescription>
             </div>
             <Button asChild>
               <Link href="/outfitter/dashboard/create">
@@ -88,44 +94,48 @@ export default async function OutfitterDashboard() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Package Details</TableHead>
-                  <TableHead>Base Price</TableHead>
+                  <TableHead>Package</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="text-center">Views</TableHead>
+                  <TableHead className="text-center">Leads</TableHead>
+                  <TableHead className="text-center">Conv. %</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {inventory.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="h-24 text-center">
+                    <TableCell colSpan={6} className="h-24 text-center">
                       You haven't listed any hunts yet.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  inventory.map((hunt) => (
-                    <TableRow key={hunt.id}>
-                      <TableCell>
-                        <div className="font-medium">{hunt.title}</div>
-                        <div className="text-sm text-muted-foreground">{hunt.species?.join(', ')}</div>
-                      </TableCell>
-                      <TableCell>
-                        {new Intl.NumberFormat('en-US', {
-                          style: 'currency',
-                          currency: hunt.baseCurrency,
-                        }).format(hunt.basePrice)}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={hunt.isVerified ? 'default' : 'secondary'}>
-                          {hunt.isVerified ? 'Verified' : 'Pending Review'}
-                        </Badge>
-                      </TableCell>
-                      <td className="px-6 py-4 text-right space-x-2">
-                          <Button variant="ghost" size="icon" title="Edit Package">
-                              <Edit />
-                          </Button>
-                      </td>
-                    </TableRow>
-                  ))
+                  inventory.map((hunt) => {
+                    const viewCount = hunt.viewCount || 0;
+                    const leadCount = hunt.leadCount || 0;
+                    const conversionRate = viewCount > 0 ? ((leadCount / viewCount) * 100).toFixed(1) : '0.0';
+                    return (
+                        <TableRow key={hunt.id}>
+                        <TableCell>
+                            <div className="font-medium">{hunt.title}</div>
+                            <div className="text-sm text-muted-foreground">{new Intl.NumberFormat('en-US', { style: 'currency', currency: hunt.baseCurrency, minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(hunt.basePrice)}</div>
+                        </TableCell>
+                        <TableCell>
+                            <Badge variant={statusConfig[hunt.status]?.variant || 'outline'}>
+                                {statusConfig[hunt.status]?.label || hunt.status}
+                            </Badge>
+                        </TableCell>
+                        <TableCell className="text-center font-medium">{viewCount}</TableCell>
+                        <TableCell className="text-center font-medium">{leadCount}</TableCell>
+                        <TableCell className="text-center font-medium">{conversionRate}%</TableCell>
+                        <td className="px-6 py-4 text-right space-x-2">
+                            <Button variant="ghost" size="icon" title="Edit Package">
+                                <Edit />
+                            </Button>
+                        </td>
+                        </TableRow>
+                    )
+                  })
                 )}
               </TableBody>
             </Table>

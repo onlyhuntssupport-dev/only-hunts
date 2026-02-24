@@ -3,6 +3,7 @@ import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import { adminDb } from '@/lib/firebase/admin';
+import { firestore } from 'firebase-admin';
 import { ShieldCheck, MapPin, Target } from 'lucide-react';
 import { Hunt, HuntSchema } from '@/lib/validations/hunt';
 import { Badge } from '@/components/ui/badge';
@@ -38,6 +39,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function HuntDetailPage({ params }: Props) {
+  try {
+    await adminDb.collection('hunts').doc(params.id).update({
+        viewCount: firestore.FieldValue.increment(1),
+        lastViewedAt: new Date().toISOString()
+    });
+  } catch(error) {
+      console.error("Failed to update view count, hunt may not exist yet or other error.", error);
+  }
+
   const doc = await adminDb.collection('hunts').doc(params.id).get();
   
   if (!doc.exists) {

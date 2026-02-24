@@ -15,6 +15,8 @@ export const HuntSchema = z.object({
   isVerified: z.boolean().default(false),
   createdAt: z.any(),
   leadCount: z.number().optional(),
+  viewCount: z.number().optional(),
+  lastViewedAt: z.any().optional(),
   status: z.enum(['pending', 'active', 'rejected']).default('pending'),
   approvedAt: z.any().optional(),
 });

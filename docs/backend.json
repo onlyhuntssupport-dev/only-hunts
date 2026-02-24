@@ -113,6 +113,15 @@
           "type": "number",
           "description": "Number of inquiries for this hunt."
         },
+        "viewCount": {
+          "type": "number",
+          "description": "Number of times the hunt detail page has been viewed."
+        },
+        "lastViewedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The timestamp when the hunt was last viewed."
+        },
         "status": {
           "type": "string",
           "enum": [

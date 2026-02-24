@@ -14,6 +14,8 @@ const HuntCreationData = HuntSchema.omit({
     approvedAt: true,
     createdAt: true,
     leadCount: true,
+    viewCount: true,
+    lastViewedAt: true,
 });
 
 export async function createHunt(data: z.infer<typeof HuntCreationData>) {
@@ -26,6 +28,7 @@ export async function createHunt(data: z.infer<typeof HuntCreationData>) {
       isVerified: false, // Outfitter verification status cascades separately
       status: 'pending', // All new hunts require admin approval
       leadCount: 0,
+      viewCount: 0,
     });
 
     revalidatePath('/hunts');
