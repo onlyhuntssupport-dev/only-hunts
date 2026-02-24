@@ -34,6 +34,7 @@ const nextConfig: NextConfig = {
     FIREBASE_PROJECT_ID: 'your-project-id',
     FIREBASE_CLIENT_EMAIL: 'your-service-account-email',
     FIREBASE_PRIVATE_KEY: '-----BEGIN PRIVATE KEY-----\\n...',
+    RESEND_API_KEY: 'your-resend-api-key',
   },
 };
 
