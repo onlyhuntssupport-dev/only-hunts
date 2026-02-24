@@ -3,20 +3,29 @@ import * as admin from 'firebase-admin';
 const formatPrivateKey = (key: string) => {
   if (!key) return undefined;
   
-  // 1. Remove surrounding quotes if the environment UI added them
-  let formattedKey = key.replace(/^['"]|['"]$/g, '');
+  // 1. Clean up any accidental wrapping quotes or whitespace
+  let cleanedKey = key.trim().replace(/^['"]|['"]$/g, '');
   
-  // 2. Replace literal '\n' strings with actual newline characters
-  // This handles both \\n (double escaped) and \n (single escaped)
-  formattedKey = formattedKey.replace(/\\n/g, '\n');
-  
+  // 2. The "Nuclear" Replace: 
+  // This handles \n, \\n, and actual line breaks all at once.
+  // It also ensures the BEGIN/END tags don't have weird spacing.
+  const formattedKey = cleanedKey
+    .replace(/\\n/g, '\n')      // Convert literal \n to real newline
+    .replace(/\\/g, '')         // Remove any stray backslashes left over
+    .replace(/\n/g, '\n');      // Normalize existing newlines
+
+  // 3. Final Check: Ensure it has the PEM headers/footers
+  if (!formattedKey.includes('-----BEGIN PRIVATE KEY-----')) {
+    return `-----BEGIN PRIVATE KEY-----\n${formattedKey}\n-----END PRIVATE KEY-----`;
+  }
+
   return formattedKey;
 };
 
 const getAdminApp = () => {
-  const app = admin.apps.find(a => a);
-  if (app) return app;
+  if (admin.apps.length > 0) return admin.apps[0];
 
+  // Try fetching individual variables first
   const projectId = process.env.FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
   const rawKey = process.env.FIREBASE_PRIVATE_KEY;
@@ -24,35 +33,16 @@ const getAdminApp = () => {
   if (projectId && clientEmail && rawKey) {
     const privateKey = formatPrivateKey(rawKey);
     
-    try {
-      return admin.initializeApp({
-        credential: admin.credential.cert({ 
-          projectId, 
-          clientEmail, 
-          privateKey 
-        }),
-      });
-    } catch (error) {
-      console.error("Firebase Admin cert error:", error);
-      throw error;
-    }
+    return admin.initializeApp({
+      credential: admin.credential.cert({ 
+        projectId, 
+        clientEmail, 
+        privateKey 
+      }),
+    });
   }
 
-  // Fallback to service account JSON if individual variables are not set
-  const serviceAccountVar = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-  if(serviceAccountVar) {
-    try {
-      const serviceAccount = JSON.parse(serviceAccountVar);
-      return admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-      });
-    } catch (e) {
-      throw new Error("FIREBASE_SERVICE_ACCOUNT_KEY found but is not valid JSON.");
-    }
-  }
-
-
-  throw new Error("Firebase Admin Credentials incomplete or missing.");
+  throw new Error("Credentials still missing or malformed in environment.");
 };
 
 const app = getAdminApp();
