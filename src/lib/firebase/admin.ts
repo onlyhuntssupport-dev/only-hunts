@@ -1,3 +1,8 @@
+console.log("--- ENV DEBUG START ---");
+console.log("PROJECT_ID:", process.env.FIREBASE_PROJECT_ID ? "Found" : "MISSING");
+console.log("CLIENT_EMAIL:", process.env.FIREBASE_CLIENT_EMAIL ? "Found" : "MISSING");
+console.log("PRIVATE_KEY:", process.env.FIREBASE_PRIVATE_KEY ? "Found" : "MISSING");
+console.log("--- ENV DEBUG END ---");
 import * as admin from 'firebase-admin';
 
 const getAdminApp = () => {
