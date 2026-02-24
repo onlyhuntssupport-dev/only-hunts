@@ -1,7 +1,10 @@
+
 import { Suspense } from 'react';
 import FilterSidebar from '@/components/marketplace/FilterSidebar';
 import { HuntCard } from '@/components/marketplace/HuntCard';
 import { getHunts } from '@/lib/firebase/queries';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 
 interface PageProps {
   searchParams: { 
@@ -33,6 +36,9 @@ async function HuntList({ searchParams }: { searchParams: PageProps['searchParam
       <div className="text-center py-20 bg-card border border-dashed rounded-lg">
         <h3 className="text-xl font-headline font-bold">No matches found</h3>
         <p className="text-muted-foreground mt-2">Try adjusting your filters or checking back later.</p>
+        <Button variant="outline" asChild className="mt-4">
+            <Link href="/hunts">Clear Filters</Link>
+        </Button>
       </div>
     );
   }

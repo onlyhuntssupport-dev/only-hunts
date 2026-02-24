@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
@@ -5,8 +6,10 @@ import { useCallback } from 'react';
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { hunts, outfitters } from '@/lib/data';
+import { Button } from '../ui/button';
 
-const PROVINCES = [...new Set(outfitters.map(o => o.location.split(',')[0]))];
+// These would typically come from a database query
+const PROVINCES = [...new Set(outfitters.map(o => o.location.split(',')[0]))].sort();
 const SPECIES = [...new Set(hunts.flatMap(h => h.species))].sort();
 
 export default function FilterSidebar() {
@@ -41,10 +44,10 @@ export default function FilterSidebar() {
           <div key={item} className="flex items-center space-x-2">
             <Checkbox
               id={`${paramName}-${item}`}
-              checked={searchParams.get(paramName)?.includes(item) || false}
+              checked={searchParams.get(paramName)?.split(',').includes(item) || false}
               onCheckedChange={() => handleToggle(paramName, item)}
             />
-            <Label htmlFor={`${paramName}-${item}`} className="font-normal text-muted-foreground cursor-pointer">{item}</Label>
+            <Label htmlFor={`${paramName}-${item}`} className="font-normal text-muted-foreground cursor-pointer text-sm">{item}</Label>
           </div>
         ))}
       </div>
@@ -53,7 +56,10 @@ export default function FilterSidebar() {
 
   return (
     <aside className="w-full md:w-72 shrink-0 bg-card p-6 border rounded-lg h-fit sticky top-24">
-      <h2 className="text-xl font-headline font-bold text-foreground mb-4">Filters</h2>
+      <div className='flex items-center justify-between mb-4'>
+        <h2 className="text-xl font-headline font-bold text-foreground">Filters</h2>
+        <Button variant="link" className="p-0 h-auto text-sm" onClick={() => router.push(pathname, { scroll: false })}>Clear</Button>
+      </div>
       {createCheckboxGroup('Province', PROVINCES, 'province')}
       {createCheckboxGroup('Species', SPECIES, 'species')}
     </aside>
