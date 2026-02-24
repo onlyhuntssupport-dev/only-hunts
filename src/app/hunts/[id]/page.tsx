@@ -1,3 +1,4 @@
+
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
@@ -8,6 +9,9 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import Link from 'next/link';
 import { InquiryForm } from '@/components/marketplace/InquiryForm';
+import { cookies } from 'next/headers';
+import { adminAuth } from '@/lib/firebase/admin';
+import WishlistButton from '@/components/marketplace/WishlistButton';
 
 interface Props {
   params: { id: string };
@@ -42,6 +46,24 @@ export default async function HuntDetailPage({ params }: Props) {
   
   const hunt = HuntSchema.parse({ id: doc.id, ...doc.data() });
 
+  const sessionCookie = cookies().get('__session')?.value;
+  let user = null;
+  let isSaved = false;
+  if (sessionCookie) {
+    try {
+        user = await adminAuth.verifyIdToken(sessionCookie);
+        if (user) {
+            const wishlistRef = adminDb.collection('wishlists').doc(user.uid);
+            const wishlistDoc = await wishlistRef.get();
+            if (wishlistDoc.exists) {
+                isSaved = wishlistDoc.data()?.huntIds?.includes(hunt.id);
+            }
+        }
+    } catch (error) {
+        // user is not logged in or session is invalid, do nothing
+    }
+  }
+
   return (
     <div className="container mx-auto max-w-5xl py-12">
       <div className="relative w-full h-[50vh] md:h-[60vh] rounded-lg overflow-hidden mb-8">
@@ -58,7 +80,10 @@ export default async function HuntDetailPage({ params }: Props) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
         <div className="lg:col-span-2 space-y-8">
           <div>
-            <h1 className="text-4xl font-bold font-headline text-primary mb-2">{hunt.title}</h1>
+            <div className="flex items-start justify-between gap-4">
+              <h1 className="text-4xl font-bold font-headline text-primary mb-2">{hunt.title}</h1>
+              {user && <WishlistButton huntId={hunt.id} hunterId={user.uid} isInitiallySaved={isSaved} />}
+            </div>
             <div className="flex items-center flex-wrap gap-4 text-muted-foreground">
               <span className="flex items-center gap-1.5"><MapPin size={16} /> {hunt.province}</span>
               {hunt.isVerified && (

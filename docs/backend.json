@@ -187,6 +187,23 @@
         "createdAt",
         "status"
       ]
+    },
+    "Wishlist": {
+      "title": "Wishlist",
+      "description": "A user's wishlist of hunts.",
+      "type": "object",
+      "properties": {
+        "huntIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "An array of hunt IDs that the user has saved."
+        }
+      },
+      "required": [
+        "huntIds"
+      ]
     }
   },
   "auth": {
@@ -213,6 +230,12 @@
         "$ref": "#/entities/Inquiry"
       },
       "description": "Stores inquiries made by hunters."
+    },
+    "/wishlists/{userId}": {
+      "schema": {
+        "$ref": "#/entities/Wishlist"
+      },
+      "description": "Stores a user's wishlist of hunts. The document ID is the user's UID."
     }
   }
 }

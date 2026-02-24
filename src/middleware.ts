@@ -14,9 +14,13 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
+  if (!session && request.nextUrl.pathname.startsWith('/hunter')) {
+    return NextResponse.redirect(new URL('/login?redirect=' + request.nextUrl.pathname, request.url));
+  }
+
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ['/outfitter/dashboard/:path*', '/profile/:path*'],
+  matcher: ['/outfitter/dashboard/:path*', '/profile/:path*', '/hunter/:path*'],
 };
