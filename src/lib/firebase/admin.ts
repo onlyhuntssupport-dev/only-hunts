@@ -1,25 +1,48 @@
 import * as admin from 'firebase-admin';
 
+const formatPrivateKey = (key: string) => {
+  if (!key) return undefined;
+  
+  // 1. Remove surrounding quotes if the environment UI added them
+  let formattedKey = key.replace(/^['"]|['"]$/g, '');
+  
+  // 2. Replace literal '\n' strings with actual newline characters
+  // This handles both \\n (double escaped) and \n (single escaped)
+  formattedKey = formattedKey.replace(/\\n/g, '\n');
+  
+  return formattedKey;
+};
+
 const getAdminApp = () => {
   if (admin.apps.length > 0) {
-    return admin.apps[0]!;
-  }
+    const app = admin.apps[0];
+    if(app) return app;
+  };
 
-  // 1. Try to get the individual variables
   const projectId = process.env.FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+  const rawKey = process.env.FIREBASE_PRIVATE_KEY;
 
-  // 2. Try to get the combined JSON string (The "Golden" Backup)
-  const serviceAccountVar = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-
-  if (projectId && clientEmail && privateKey) {
-    return admin.initializeApp({
-      credential: admin.credential.cert({ projectId, clientEmail, privateKey }),
-    });
+  if (projectId && clientEmail && rawKey) {
+    const privateKey = formatPrivateKey(rawKey);
+    
+    try {
+      return admin.initializeApp({
+        credential: admin.credential.cert({ 
+          projectId, 
+          clientEmail, 
+          privateKey 
+        }),
+      });
+    } catch (error) {
+      console.error("Firebase Admin cert error:", error);
+      throw error;
+    }
   }
 
-  if (serviceAccountVar) {
+  // Fallback to service account JSON if individual variables are not set
+  const serviceAccountVar = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+  if(serviceAccountVar) {
     try {
       const serviceAccount = JSON.parse(serviceAccountVar);
       return admin.initializeApp({
@@ -30,11 +53,10 @@ const getAdminApp = () => {
     }
   }
 
-  throw new Error(
-    "CRITICAL: All Firebase Admin Credential methods failed. Check your environment UI."
-  );
+
+  throw new Error("Firebase Admin Credentials incomplete or missing.");
 };
 
-const app = getAdminApp()!;
+const app = getAdminApp();
 export const adminAuth = admin.auth(app);
 export const adminDb = admin.firestore(app);
