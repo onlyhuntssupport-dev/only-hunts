@@ -1,0 +1,28 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper functions
+    function isImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+    function isUnderSizeLimit() {
+      return request.resource.size < 2 * 1024 * 1024; // 2MB hard limit
+    }
+    function isOutfitter() {
+      return request.auth != null && request.auth.token.role == 'OUTFITTER';
+    }
+
+    // Match the specific outfitter's hunt folder
+    match /hunts/{outfitterId}/{fileName} {
+      // Anyone can view marketplace images
+      allow read: if true;
+      
+      // Only the outfitter who owns the folder can upload/edit, must be an image < 2MB
+      allow write: if isOutfitter() 
+                   && request.auth.uid == outfitterId 
+                   && isImage() 
+                   && isUnderSizeLimit();
+    }
+  }
+}
