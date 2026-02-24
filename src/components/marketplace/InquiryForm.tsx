@@ -16,6 +16,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/firebase';
 import { type Hunt } from '@/lib/validations/hunt';
@@ -34,6 +35,10 @@ const FormSchema = z.object({
   message: z.string().min(10, {
     message: 'Message must be at least 10 characters.',
   }),
+  consent_share: z.literal(true, {
+    errorMap: () => ({ message: 'You must agree to share your contact information.' }),
+  }),
+  consent_marketing: z.boolean().default(false).optional(),
 });
 
 interface InquiryFormProps {
@@ -50,6 +55,8 @@ export function InquiryForm({ hunt }: InquiryFormProps) {
     resolver: zodResolver(FormSchema),
     defaultValues: {
       message: '',
+      consent_share: false,
+      consent_marketing: false,
     },
   });
 
@@ -129,7 +136,7 @@ export function InquiryForm({ hunt }: InquiryFormProps) {
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <FormField
               control={form.control}
               name="message"
@@ -147,6 +154,55 @@ export function InquiryForm({ hunt }: InquiryFormProps) {
                 </FormItem>
               )}
             />
+            
+            <div className="space-y-4 pt-4 border-t">
+              <FormField
+                control={form.control}
+                name="consent_share"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <label
+                        htmlFor="consent_share"
+                        className="text-xs font-normal text-muted-foreground"
+                      >
+                        I agree to share my contact details with the Outfitter for the purpose of this inquiry in accordance with the{' '}
+                        <Link href="/legal/privacy" className="underline hover:text-primary">
+                          Privacy Policy
+                        </Link>.
+                      </label>
+                      <FormMessage />
+                    </div>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="consent_marketing"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel className="text-xs font-normal text-muted-foreground">
+                        Keep me updated with new hunts and South African hunting news (Optional).
+                      </FormLabel>
+                    </div>
+                  </FormItem>
+                )}
+              />
+            </div>
+
             <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isSubmitting ? 'Sending...' : 'Send Inquiry'}
