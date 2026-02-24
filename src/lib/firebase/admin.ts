@@ -1,29 +1,34 @@
-import admin from 'firebase-admin';
+import * as admin from 'firebase-admin';
 
-// 1. Validation helper to ensure env vars are loaded
-const getEnvVar = (name: string) => {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(`Missing Environment Variable: ${name}`);
+const getAdminApp = () => {
+  if (admin.apps.length > 0) {
+    return admin.apps[0]!;
   }
-  return value;
+
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+
+  if (!projectId || !clientEmail || !privateKey) {
+    // This will now throw a clear error in your terminal 
+    // instead of letting the app crash silently.
+    throw new Error(
+      "Firebase Admin Credentials missing. Check FIREBASE_PROJECT_ID, CLIENT_EMAIL, and PRIVATE_KEY in your environment variables."
+    );
+  }
+
+  return admin.initializeApp({
+    credential: admin.credential.cert({
+      projectId,
+      clientEmail,
+      privateKey,
+    }),
+  });
 };
 
-if (!admin.apps.length) {
-  try {
-    admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId: getEnvVar('FIREBASE_PROJECT_ID'),
-        clientEmail: getEnvVar('FIREBASE_CLIENT_EMAIL'),
-        // Handle both actual newlines and escaped string newlines
-        privateKey: getEnvVar('FIREBASE_PRIVATE_KEY').replace(/\\n/g, '\n'),
-      }),
-    });
-    console.log("Firebase Admin Initialized Successfully");
-  } catch (error) {
-    console.error("Firebase Admin Initialization Error:", error);
-  }
-}
+// Initialize the app
+const app = getAdminApp();
 
-export const adminAuth = admin.auth();
-export const adminDb = admin.firestore();
+// Export services tied to the initialized app
+export const adminAuth = admin.auth(app);
+export const adminDb = admin.firestore(app);
