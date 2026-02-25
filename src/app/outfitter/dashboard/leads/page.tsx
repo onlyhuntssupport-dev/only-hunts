@@ -1,3 +1,4 @@
+
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
@@ -88,7 +89,7 @@ export default async function OutfitterLeadsPage() {
                   <TableCell className="text-right">
                     <StatusSelect inquiryId={lead.id} currentStatus={lead.status} />
                   </TableCell>
-                </tr >
+                </tr>
               ))
             )}
           </TableBody>

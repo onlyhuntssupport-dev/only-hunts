@@ -1,7 +1,7 @@
 
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import imageCompression from 'browser-image-compression';
-import { firebaseApp } from './config';
+import { firebaseApp } from '@/firebase/config';
 
 const storage = getStorage(firebaseApp);
 
