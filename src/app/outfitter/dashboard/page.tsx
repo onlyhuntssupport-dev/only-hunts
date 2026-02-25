@@ -1,16 +1,13 @@
-
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
-import { Edit, PlusCircle, Mail } from 'lucide-react';
-import Link from 'next/link';
+import StatusSelect from './StatusSelect';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-  CardFooter,
 } from '@/components/ui/card';
 import {
   Table,
@@ -20,14 +17,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import type { Hunt } from '@/lib/validations/hunt';
 import type { Inquiry } from '@/lib/validations/inquiry';
 
-export default async function OutfitterDashboard() {
-  const sessionCookie = cookies().get('__session')?.value;
-  if (!sessionCookie) redirect('/login?redirect=/outfitter/dashboard');
+export default async function OutfitterLeadsPage() {
+  const cookieStore = await cookies();
+  const sessionCookie = cookieStore.get('__session')?.value;
+  
+  if (!sessionCookie) redirect('/login?redirect=/outfitter/dashboard/leads');
 
   let uid: string;
   try {
@@ -35,146 +31,63 @@ export default async function OutfitterDashboard() {
     if (decodedToken.role !== 'OUTFITTER') redirect('/unauthorized');
     uid = decodedToken.uid;
   } catch (error) {
-    redirect('/login?redirect=/outfitter/dashboard');
+    redirect('/login?redirect=/outfitter/dashboard/leads');
   }
 
-  const inventorySnapshot = await adminDb
-    .collection('hunts')
+  // Fetch inquiries for this outfitter
+  const snapshot = await adminDb.collection('inquiries')
     .where('outfitterId', '==', uid)
     .orderBy('createdAt', 'desc')
     .get();
 
-  const inquiriesSnapshot = await adminDb
-    .collection('inquiries')
-    .where('outfitterId', '==', uid)
-    .orderBy('createdAt', 'desc')
-    .limit(5)
-    .get();
-  
-  const newInquiriesSnapshot = await adminDb
-    .collection('inquiries')
-    .where('outfitterId', '==', uid)
-    .where('status', '==', 'new')
-    .get();
-
-  const inventory = inventorySnapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  })) as Hunt[];
-
-  const recentInquiries = inquiriesSnapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  })) as Inquiry[];
-
-  const newInquiriesCount = newInquiriesSnapshot.size;
-
-  const statusConfig = {
-    pending: { variant: 'secondary', label: 'Pending' },
-    active: { variant: 'default', label: 'Active' },
-    rejected: { variant: 'destructive', label: 'Rejected' }
-  } as const;
+  const leads = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as (Inquiry & { id: string })[];
 
   return (
-    <div className="space-y-6 p-4 md:p-8 pt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div className="lg:col-span-2 space-y-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>My Hunt Packages</CardTitle>
-              <CardDescription>Manage your active listings and view analytics.</CardDescription>
-            </div>
-            <Button asChild>
-              <Link href="/outfitter/dashboard/create">
-                <PlusCircle /> Create New Hunt
-              </Link>
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Package</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-center">Views</TableHead>
-                  <TableHead className="text-center">Leads</TableHead>
-                  <TableHead className="text-center">Conv. %</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+    <Card>
+      <CardHeader>
+        <CardTitle>Hunter Inquiries</CardTitle>
+        <CardDescription>Manage and respond to your leads.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Hunter</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Package Inquiry</TableHead>
+              <TableHead>Message</TableHead>
+              <TableHead className="text-right">Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {leads.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                  No leads yet. When hunters inquire about your hunts, they will appear here.
+                </TableCell>
+              </TableRow>
+            ) : (
+              leads.map((lead) => (
+                <TableRow key={lead.id}>
+                  <TableCell className="font-medium">{lead.hunterName}</TableCell>
+                  <TableCell>
+                    <a href={`mailto:${lead.hunterEmail}`} className="text-primary hover:underline">
+                      {lead.hunterEmail}
+                    </a>
+                  </TableCell>
+                  <TableCell>{lead.huntTitle}</TableCell>
+                  <TableCell className="max-w-xs truncate text-muted-foreground" title={lead.message}>
+                    {lead.message}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <StatusSelect inquiryId={lead.id} currentStatus={lead.status} />
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {inventory.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center">
-                      You haven't listed any hunts yet.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  inventory.map((hunt) => {
-                    const viewCount = hunt.viewCount || 0;
-                    const leadCount = hunt.leadCount || 0;
-                    const conversionRate = viewCount > 0 ? ((leadCount / viewCount) * 100).toFixed(1) : '0.0';
-                    return (
-                        <TableRow key={hunt.id}>
-                        <TableCell>
-                            <div className="font-medium">{hunt.title}</div>
-                            <div className="text-sm text-muted-foreground">{new Intl.NumberFormat('en-US', { style: 'currency', currency: hunt.baseCurrency, minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(hunt.basePrice)}</div>
-                        </TableCell>
-                        <TableCell>
-                            <Badge variant={statusConfig[hunt.status]?.variant || 'outline'}>
-                                {statusConfig[hunt.status]?.label || hunt.status}
-                            </Badge>
-                        </TableCell>
-                        <TableCell className="text-center font-medium">{viewCount}</TableCell>
-                        <TableCell className="text-center font-medium">{leadCount}</TableCell>
-                        <TableCell className="text-center font-medium">{conversionRate}%</TableCell>
-                        <td className="px-6 py-4 text-right space-x-2">
-                            <Button variant="ghost" size="icon" title="Edit Package">
-                                <Edit />
-                            </Button>
-                        </td>
-                        </TableRow>
-                    )
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </div>
-      <div className="lg:col-span-1 space-y-6">
-         <Card>
-           <CardHeader>
-             <CardTitle className="flex items-center justify-between">
-                <span>Recent Leads</span>
-                {newInquiriesCount > 0 && <Badge>{newInquiriesCount} New</Badge>}
-            </CardTitle>
-            <CardDescription>Latest inquiries from potential clients.</CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="space-y-4">
-              {recentInquiries.length === 0 ? (
-                <p className="text-sm text-muted-foreground p-6 text-center">No inquiries yet.</p>
-              ) : recentInquiries.map((inquiry, index) => (
-                <div key={inquiry.id} className={`p-4 flex items-center justify-between ${index < recentInquiries.length - 1 ? 'border-b' : ''}`}>
-                  <div>
-                    <p className="font-medium text-sm">{inquiry.hunterName}</p>
-                    <p className="text-xs text-muted-foreground">{inquiry.huntTitle}</p>
-                  </div>
-                  <Badge variant={inquiry.status === 'new' ? 'default' : 'outline'}>{inquiry.status}</Badge>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-          <CardFooter className="pt-6">
-            <Button asChild className="w-full">
-              <Link href="/outfitter/dashboard/leads">
-                <Mail className="mr-2" /> View All Inquiries
-              </Link>
-            </Button>
-          </CardFooter>
-        </Card>
-      </div>
-    </div>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
   );
 }
