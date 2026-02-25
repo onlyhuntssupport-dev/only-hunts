@@ -15,3 +15,7 @@ runConfig:
     secret: FIREBASE_PRIVATE_KEY
   - variable: RESEND_API_KEY
     secret: RESEND_API_KEY
+The Exact Fix for src/app/outfitter/dashboard/leads/page.tsx
+Open the file src/app/outfitter/dashboard/leads/page.tsx. Scroll down to where your return statement is, specifically where the <TableBody> starts.
+
+Replace your entire <TableBody> ... </TableBody> section with this exact block of code:
