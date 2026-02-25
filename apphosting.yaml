@@ -1,17 +1,6 @@
-# Settings to manage and configure a Firebase App Hosting backend.
-# https://firebase.google.com/docs/app-hosting/configure
-
-runConfig:
-  # Increase this value if you'd like to automatically spin up
-  # more instances in response to increased traffic.
-  maxInstances: 1
-
-  env:
-  - variable: FIREBASE_PROJECT_ID
-    secret: FIREBASE_PROJECT_ID
+# apphosting.yaml
+env:
   - variable: FIREBASE_CLIENT_EMAIL
     secret: FIREBASE_CLIENT_EMAIL
   - variable: FIREBASE_PRIVATE_KEY
     secret: FIREBASE_PRIVATE_KEY
-  - variable: RESEND_API_KEY
-    secret: RESEND_API_KEY
