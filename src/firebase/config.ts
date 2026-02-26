@@ -3,22 +3,18 @@
 import { getApp, getApps, initializeApp, type FirebaseOptions } from 'firebase/app';
 import { getAnalytics, isSupported, type Analytics } from 'firebase/analytics';
 
-const firebaseConfigString = process.env.NEXT_PUBLIC_FIREBASE_CONFIG;
+const firebaseConfig: FirebaseOptions = {
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
+};
 
-let firebaseConfig: FirebaseOptions;
-
-if (!firebaseConfigString || firebaseConfigString === 'undefined') {
-  console.warn("NEXT_PUBLIC_FIREBASE_CONFIG is not set. Using placeholder configuration. Please set up your Firebase project and configure the environment variable.");
-  firebaseConfig = {
-    apiKey: "placeholder",
-    authDomain: "placeholder.firebaseapp.com",
-    projectId: "placeholder",
-    storageBucket: "placeholder.appspot.com",
-    messagingSenderId: "placeholder",
-    appId: "placeholder",
-  };
-} else {
-  firebaseConfig = JSON.parse(firebaseConfigString);
+if (!firebaseConfig.apiKey || firebaseConfig.apiKey === 'placeholder') {
+    console.warn("Firebase configuration is not fully set. Please check your NEXT_PUBLIC_ environment variables.");
 }
 
 
