@@ -4,15 +4,15 @@ import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import { adminDb } from '@/lib/firebase/admin';
 import { ShieldCheck, MapPin, Target } from 'lucide-react';
-import { Hunt, HuntSchema } from '@/lib/validations/hunt';
+import { HuntSchema } from '@/lib/validations/hunt';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import Link from 'next/link';
-import { InquiryForm } from '@/components/marketplace/InquiryForm';
 import { cookies } from 'next/headers';
 import { adminAuth } from '@/lib/firebase/admin';
 import WishlistButton from '@/components/marketplace/WishlistButton';
 import AnalyticsTracker from '@/components/marketplace/AnalyticsTracker';
+import LeadForm from '@/components/marketplace/LeadForm';
 
 interface Props {
   params: { id: string };
@@ -111,7 +111,7 @@ export default async function HuntDetailPage({ params }: Props) {
 
           <div className="lg:col-span-1">
             <Card className="sticky top-24">
-              <CardContent className="p-6 space-y-6">
+              <CardContent className="p-6 space-y-4">
                   <div>
                       <p className="text-sm text-muted-foreground mb-1">Starting from</p>
                       <p className="text-3xl font-bold text-primary">
@@ -125,8 +125,13 @@ export default async function HuntDetailPage({ params }: Props) {
                   <p className="text-sm font-medium">
                     Offered by: <Link href={`/outfitters/${hunt.outfitterId}`} className="font-bold text-primary hover:underline">{hunt.outfitterName}</Link>
                   </p>
+                  
+                  <LeadForm
+                    huntId={hunt.id}
+                    outfitterId={hunt.outfitterId}
+                    huntTitle={hunt.title}
+                  />
 
-                  <InquiryForm hunt={hunt} />
               </CardContent>
             </Card>
           </div>
