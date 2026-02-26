@@ -1,4 +1,3 @@
-
 import { Suspense } from 'react';
 import FilterSidebar from '@/components/marketplace/FilterSidebar';
 import { HuntCard } from '@/components/marketplace/HuntCard';
@@ -61,7 +60,10 @@ export default function HuntsPage({ searchParams }: PageProps) {
       </header>
       
       <div className="flex flex-col md:flex-row gap-8 items-start">
-        <FilterSidebar />
+        {/* FIX: FilterSidebar is now wrapped in a Suspense boundary */}
+        <Suspense fallback={<div className="w-64 h-96 bg-muted animate-pulse rounded-lg" />}>
+          <FilterSidebar />
+        </Suspense>
         
         <main className="flex-1">
           <Suspense fallback={<HuntGridSkeleton />}>
