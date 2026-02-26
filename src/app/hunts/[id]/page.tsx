@@ -12,7 +12,7 @@ import { InquiryForm } from '@/components/marketplace/InquiryForm';
 import { cookies } from 'next/headers';
 import { adminAuth } from '@/lib/firebase/admin';
 import WishlistButton from '@/components/marketplace/WishlistButton';
-import AnalyticsEventTracker from '@/components/analytics/AnalyticsEventTracker';
+import AnalyticsTracker from '@/components/marketplace/AnalyticsTracker';
 
 interface Props {
   params: { id: string };
@@ -67,7 +67,7 @@ export default async function HuntDetailPage({ params }: Props) {
 
   return (
     <>
-      <AnalyticsEventTracker hunt={{ id: hunt.id, title: hunt.title, province: hunt.province }} />
+      <AnalyticsTracker huntId={hunt.id} />
       <div className="container mx-auto max-w-5xl py-12">
         <div className="relative w-full h-[50vh] md:h-[60vh] rounded-lg overflow-hidden mb-8">
           <Image 
