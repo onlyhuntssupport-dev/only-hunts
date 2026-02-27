@@ -14,11 +14,11 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Logo } from '@/components/icons';
-import { useUser, useAuth } from '@/firebase';
-import { signOut } from 'firebase/auth';
+import { useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Skeleton } from '../ui/skeleton';
+import { logOut } from '@/lib/firebase/auth';
 
 interface NavLink {
   id: string;
@@ -34,12 +34,11 @@ const navLinks: NavLink[] = [
 
 export function Header() {
   const { user, loading } = useUser();
-  const auth = useAuth();
   const { toast } = useToast();
 
   const handleSignOut = async () => {
     try {
-      await signOut(auth);
+      await logOut();
       toast({ title: "Logged out successfully." });
     } catch (error) {
       toast({ variant: 'destructive', title: "Logout failed.", description: "Please try again." });
@@ -155,7 +154,7 @@ export function Header() {
                  <Link href="/login">Log In</Link>
               </Button>
               <Button asChild>
-                <Link href="/register">Sign Up</Link>
+                <Link href="/login">Sign Up</Link>
               </Button>
             </div>
           )}
