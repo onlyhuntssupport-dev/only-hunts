@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { signInWithGoogle } from '@/lib/firebase/auth';
 import { syncUserProfile } from '@/app/actions/users';
 import { Button } from '@/components/ui/button';
-import { useUser } from '@/firebase';
 import type { UserRole } from '@/types/auth';
 
 export default function AuthForm() {
