@@ -1,15 +1,17 @@
+
 'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { signInWithGoogle } from '@/lib/firebase/auth';
+import { syncUserProfile } from '@/app/actions/users';
 import { Button } from '@/components/ui/button';
-import { setUserRole } from '@/app/actions/auth';
 import { useUser } from '@/firebase';
+import type { UserRole } from '@/types/auth';
 
 export default function AuthForm() {
   const [isLogin, setIsLogin] = useState(true);
-  const [role, setRole] = useState<'HUNTER' | 'OUTFITTER'>('HUNTER');
+  const [role, setRole] = useState<UserRole>('HUNTER');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
@@ -18,23 +20,38 @@ export default function AuthForm() {
     setIsLoading(true);
     setError('');
     
-    const user = await signInWithGoogle();
-    
-    if (user) {
-      if (!isLogin) {
-        // If it's a new sign-up, set their role based on the selection
-        const roleResult = await setUserRole(user.uid, role);
-        if (!roleResult.success) {
-            setError(roleResult.error || 'Could not set user role.');
-            setIsLoading(false);
-            return;
-        }
+    try {
+      // 1. Authenticate with Firebase Client
+      const user = await signInWithGoogle();
+      if (!user) throw new Error('Authentication failed');
+
+      // 2. Sync profile to Firestore securely via Server Action
+      // On login, we pass the existing role (or a default) which is ignored by the server
+      // in favor of the database record. On signup, we pass the selected role.
+      const syncResult = await syncUserProfile({
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName,
+        photoURL: user.photoURL,
+        role: isLogin ? 'HUNTER' : role,
+      });
+
+      if (!syncResult.success) throw new Error(syncResult.error || 'Profile sync failed');
+
+      // 3. Route based on the verified role from the database
+      if (syncResult.role === 'OUTFITTER') {
+        router.push('/outfitter/dashboard');
+      } else if (syncResult.role === 'ADMIN') {
+        router.push('/admin');
       }
-      // Redirect after login/signup
-      router.push('/hunts');
-      router.refresh();
-    } else {
-      setError('Failed to authenticate with Google. Please try again.');
+      else {
+        router.push('/hunts');
+      }
+      router.refresh(); // Ensure server components re-render with new auth state
+
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'An error occurred during sign in.');
       setIsLoading(false);
     }
   };
@@ -67,14 +84,14 @@ export default function AuthForm() {
             <button
               type="button"
               onClick={() => setRole('HUNTER')}
-              className={`p-2 border rounded-md text-sm ${role === 'HUNTER' ? 'bg-primary/10 border-primary font-bold' : 'bg-background'}`}
+              className={`p-2 border rounded-md text-sm ${role === 'HUNTER' ? 'bg-primary/10 border-primary font-bold' : 'bg-background hover:bg-muted'}`}
             >
               Hunter
             </button>
             <button
               type="button"
               onClick={() => setRole('OUTFITTER')}
-              className={`p-2 border rounded-md text-sm ${role === 'OUTFITTER' ? 'bg-primary/10 border-primary font-bold' : 'bg-background'}`}
+              className={`p-2 border rounded-md text-sm ${role === 'OUTFITTER' ? 'bg-primary/10 border-primary font-bold' : 'bg-background hover:bg-muted'}`}
             >
               Outfitter
             </button>
