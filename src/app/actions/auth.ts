@@ -2,6 +2,8 @@
 
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { revalidatePath } from 'next/cache';
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 
 export async function setUserRole(uid: string, role: 'HUNTER' | 'OUTFITTER') {
   try {
@@ -20,4 +22,9 @@ export async function setUserRole(uid: string, role: 'HUNTER' | 'OUTFITTER') {
     console.error("Failed to set user role:", error);
     return { success: false, error: "Authorization failed" };
   }
+}
+
+export async function serverLogOut() {
+  cookies().delete('session');
+  redirect('/login');
 }

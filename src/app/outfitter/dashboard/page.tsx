@@ -1,93 +1,64 @@
-import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
-import { adminAuth, adminDb } from '@/lib/firebase/admin';
-import StatusSelect from './leads/StatusSelect';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import type { Inquiry } from '@/lib/validations/inquiry';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { ArrowRight, BarChart, DollarSign, Users } from 'lucide-react';
 
-export default async function OutfitterLeadsPage() {
-  const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get('__session')?.value;
-  
-  if (!sessionCookie) redirect('/login?redirect=/outfitter/dashboard/leads');
-
-  let uid: string;
-  try {
-    const decodedToken = await adminAuth.verifyIdToken(sessionCookie);
-    if (decodedToken.role !== 'OUTFITTER') redirect('/unauthorized');
-    uid = decodedToken.uid;
-  } catch (error) {
-    redirect('/login?redirect=/outfitter/dashboard/leads');
-  }
-
-  // Fetch inquiries for this outfitter
-  const snapshot = await adminDb.collection('inquiries')
-    .where('outfitterId', '==', uid)
-    .orderBy('createdAt', 'desc')
-    .get();
-
-  const leads = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as (Inquiry & { id: string })[];
-
+export default function DashboardOverview() {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Hunter Inquiries</CardTitle>
-        <CardDescription>Manage and respond to your leads.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Hunter</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Package Inquiry</TableHead>
-              <TableHead>Message</TableHead>
-              <TableHead className="text-right">Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {leads.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                  No leads yet. When hunters inquire about your hunts, they will appear here.
-                </TableCell>
-              </TableRow>
-            ) : (
-              leads.map((lead) => (
-                <TableRow key={lead.id}>
-                  <TableCell className="font-medium">{lead.hunterName}</TableCell>
-                  <TableCell>
-                    <a href={`mailto:${lead.hunterEmail}`} className="text-primary hover:underline">
-                      {lead.hunterEmail}
-                    </a>
-                  </TableCell>
-                  <TableCell>{lead.huntTitle}</TableCell>
-                  <TableCell className="max-w-xs truncate text-muted-foreground" title={lead.message}>
-                    {lead.message}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <StatusSelect inquiryId={lead.id} currentStatus={lead.status} />
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+    <div className="space-y-8">
+      <div>
+        <h1 className="text-3xl font-headline font-bold tracking-tight">Dashboard Overview</h1>
+        <p className="text-muted-foreground mt-1">
+          Welcome back. Here is a quick snapshot of your business.
+        </p>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-3">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Hunts</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">0</div>
+            <p className="text-xs text-muted-foreground mt-1">Listings live on the marketplace</p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">New Inquiries</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">0</div>
+            <p className="text-xs text-muted-foreground mt-1">Unread leads from hunters</p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Profile Views</CardTitle>
+            <BarChart className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">0</div>
+            <p className="text-xs text-muted-foreground mt-1">Last 30 days</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="mt-8 text-center border-2 border-dashed rounded-lg p-12">
+        <h3 className="text-xl font-bold font-headline mb-2">Ready to list your first package?</h3>
+        <p className="text-muted-foreground max-w-md mx-auto mb-6">
+          Start reaching hunters globally by adding your first hunting package to the marketplace.
+        </p>
+        <Button size="lg" asChild>
+          <Link href="/outfitter/dashboard/create">
+            Create a Hunt <ArrowRight className="ml-2 h-4 w-4" />
+          </Link>
+        </Button>
+      </div>
+    </div>
   );
 }
