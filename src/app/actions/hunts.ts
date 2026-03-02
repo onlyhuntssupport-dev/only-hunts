@@ -5,6 +5,7 @@ import { adminDb } from '@/lib/firebase/admin';
 import { revalidatePath } from 'next/cache';
 import { Hunt, HuntSchema } from '@/lib/validations/hunt';
 import { z } from 'zod';
+import { firestore } from 'firebase-admin';
 
 // We don't want the client sending these fields, as they are controlled by the server.
 const HuntCreationData = HuntSchema.omit({ 
@@ -33,6 +34,7 @@ export async function createHunt(data: z.infer<typeof HuntCreationData>) {
 
     revalidatePath('/hunts');
     revalidatePath('/outfitter/dashboard');
+    revalidatePath('/outfitter/dashboard/hunts');
     
     return { success: true, huntId: docRef.id };
   } catch (error) {
@@ -41,5 +43,50 @@ export async function createHunt(data: z.infer<typeof HuntCreationData>) {
       return { success: false, error: "Validation failed.", issues: error.errors };
     }
     return { success: false, error: "An unknown error occurred while creating the hunt." };
+  }
+}
+
+export async function getOutfitterHunts(outfitterId: string) {
+  try {
+    const snapshot = await adminDb
+      .collection('hunts')
+      .where('outfitterId', '==', outfitterId)
+      .orderBy('createdAt', 'desc')
+      .get();
+      
+    const hunts = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+
+    // Convert Firestore Timestamps to strings for client-side serialization
+    const serializableHunts = hunts.map(hunt => {
+        const serializableHunt: { [key: string]: any } = { id: hunt.id };
+        for (const key in hunt) {
+            if (hunt[key] instanceof firestore.Timestamp) {
+                serializableHunt[key] = hunt[key].toDate().toISOString();
+            } else {
+                serializableHunt[key] = hunt[key];
+            }
+        }
+        return serializableHunt;
+    });
+
+    return { success: true, hunts: serializableHunts };
+  } catch (error) {
+    console.error('Error fetching hunts:', error);
+    return { success: false, error: 'Failed to fetch hunts', hunts: [] };
+  }
+}
+
+export async function deleteHunt(huntId: string) {
+  try {
+    await adminDb.collection('hunts').doc(huntId).delete();
+    revalidatePath('/outfitter/dashboard/hunts');
+    revalidatePath('/outfitter/dashboard');
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting hunt:', error);
+    return { success: false, error: 'Failed to delete hunt' };
   }
 }
