@@ -13,23 +13,27 @@ import { adminAuth } from '@/lib/firebase/admin';
 import WishlistButton from '@/components/marketplace/WishlistButton';
 import AnalyticsTracker from '@/components/marketplace/AnalyticsTracker';
 import LeadForm from '@/components/marketplace/LeadForm';
+import { getHuntById } from '@/app/actions/hunts';
 
 interface Props {
   params: { id: string };
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const doc = await adminDb.collection('hunts').doc(params.id).get();
+  const { id } = params;
+  const { hunt } = await getHuntById(id);
   
-  if (!doc.exists) {
+  if (!hunt) {
     return { title: 'Hunt Not Found' };
   }
   
-  const hunt = doc.data() as any;
-  
+  const description = hunt.description 
+    ? hunt.description.substring(0, 160) + '...'
+    : `Book this premium hunting package in ${hunt.province || 'South Africa'} with ${hunt.outfitterName || 'a premier outfitter'}.`;
+
   return {
     title: `${hunt.title || 'Untitled Hunt'} | ${hunt.outfitterName || 'OnlyHunts'}`,
-    description: `Book this premium hunting package in ${hunt.province || 'South Africa'} with ${hunt.outfitterName || 'a premier outfitter'}.`,
+    description: description,
     openGraph: {
       title: hunt.title || 'Untitled Hunt',
       description: `Premium hunting in ${hunt.province || 'South Africa'}`,
@@ -39,13 +43,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function HuntDetailPage({ params }: Props) {
-  const doc = await adminDb.collection('hunts').doc(params.id).get();
+  const { id } = params;
+  const { hunt: huntData, success } = await getHuntById(id);
   
-  if (!doc.exists) {
+  if (!success || !huntData) {
     notFound();
   }
   
-  const hunt = HuntSchema.parse({ id: doc.id, ...doc.data() });
+  const hunt = HuntSchema.parse(huntData);
 
   const sessionCookie = cookies().get('__session')?.value;
   let user = null;
@@ -96,6 +101,13 @@ export default async function HuntDetailPage({ params }: Props) {
                 )}
               </div>
             </div>
+
+            {hunt.description && (
+                <section>
+                    <h2 className="text-2xl font-bold font-headline text-primary mb-4">About This Adventure</h2>
+                    <p className="text-muted-foreground whitespace-pre-line">{hunt.description}</p>
+                </section>
+            )}
 
             <section>
               <h2 className="text-2xl font-bold font-headline text-primary mb-4">Included Species</h2>

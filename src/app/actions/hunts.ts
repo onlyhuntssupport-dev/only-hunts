@@ -119,3 +119,32 @@ export async function getPublishedHunts() {
     return { success: false, error: 'Failed to load the marketplace', hunts: [] };
   }
 }
+
+export async function getHuntById(id: string) {
+    try {
+      const docSnap = await adminDb.collection('hunts').doc(id).get();
+      
+      if (!docSnap.exists) {
+        return { success: false, error: 'Hunt not found', hunt: null };
+      }
+  
+      const data = docSnap.data();
+      // Ensure Timestamps are serialized for the client
+      const serializableData: { [key: string]: any } = { id: docSnap.id };
+      for (const key in data) {
+          if (data[key] instanceof firestore.Timestamp) {
+              serializableData[key] = data[key].toDate().toISOString();
+          } else {
+              serializableData[key] = data[key];
+          }
+      }
+  
+      return { 
+        success: true, 
+        hunt: serializableData
+      };
+    } catch (error) {
+      console.error('Error fetching hunt by ID:', error);
+      return { success: false, error: 'Failed to fetch hunt details', hunt: null };
+    }
+}

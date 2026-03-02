@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Upload, DollarSign, MapPin, Loader2, ArrowLeft } from 'lucide-react';
+import { Upload, DollarSign, Loader2, ArrowLeft } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -19,10 +19,12 @@ import {
 import { uploadHuntImage } from '@/lib/firebase/storage';
 import { createHunt } from '@/app/actions/hunts';
 import { useRouter } from 'next/navigation';
+import { Textarea } from '../ui/textarea';
 
 // Schemas for each step for clear validation
 const step1Schema = z.object({
   title: z.string().min(5, "Title must be at least 5 characters."),
+  description: z.string().min(20, "Please provide a description of at least 20 characters."),
   basePrice: z.coerce.number().positive("Price must be a positive number."),
   baseCurrency: z.enum(['USD', 'EUR', 'ZAR']),
 });
@@ -45,7 +47,7 @@ export default function HuntCreator({ outfitterId, outfitterName }: { outfitterI
 
   const { control: control1, handleSubmit: handleSubmit1, formState: { errors: errors1 } } = useForm({
     resolver: zodResolver(step1Schema),
-    defaultValues: { title: formData.title || '', basePrice: formData.basePrice || undefined, baseCurrency: formData.baseCurrency || 'USD' }
+    defaultValues: { title: formData.title || '', description: formData.description || '', basePrice: formData.basePrice || undefined, baseCurrency: formData.baseCurrency || 'USD' }
   });
 
   const { control: control2, handleSubmit: handleSubmit2, formState: { errors: errors2 } } = useForm({
@@ -125,6 +127,14 @@ export default function HuntCreator({ outfitterId, outfitterName }: { outfitterI
                     <label className="block text-sm font-medium mb-1">Hunt Title</label>
                     <Input {...field} placeholder="e.g. 7-Day Trophy Kudu Safari" />
                     {errors1.title && <p className="text-destructive text-xs mt-1">{errors1.title.message}</p>}
+                </div>
+            )} />
+
+             <Controller name="description" control={control1} render={({ field }) => (
+                <div>
+                    <label className="block text-sm font-medium mb-1">Hunt Description</label>
+                    <Textarea {...field} placeholder="Describe the lodge, the daily routine, what is included/excluded..." rows={5} />
+                    {errors1.description && <p className="text-destructive text-xs mt-1">{errors1.description.message}</p>}
                 </div>
             )} />
 

@@ -4,6 +4,7 @@ import { z } from 'zod';
 export const HuntSchema = z.object({
   id: z.string(),
   title: z.string().min(5),
+  description: z.string().min(20, 'Please provide a detailed description.'),
   outfitterId: z.string(),
   outfitterName: z.string(),
   basePrice: z.number().positive(),
