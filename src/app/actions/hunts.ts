@@ -90,3 +90,32 @@ export async function deleteHunt(huntId: string) {
     return { success: false, error: 'Failed to delete hunt' };
   }
 }
+
+export async function getPublishedHunts() {
+  try {
+    const snapshot = await adminDb
+      .collection('hunts')
+      .where('status', '==', 'active') // Changed to 'active' to match schema
+      .orderBy('createdAt', 'desc')
+      .get();
+      
+    const hunts = snapshot.docs.map(doc => {
+        const data = doc.data();
+        // Convert Firestore Timestamps to strings for client-side serialization
+        const serializableData: { [key: string]: any } = { id: doc.id };
+        for (const key in data) {
+            if (data[key] instanceof firestore.Timestamp) {
+                serializableData[key] = data[key].toDate().toISOString();
+            } else {
+                serializableData[key] = data[key];
+            }
+        }
+        return serializableData;
+    });
+
+    return { success: true, hunts };
+  } catch (error) {
+    console.error('Error fetching published hunts:', error);
+    return { success: false, error: 'Failed to load the marketplace', hunts: [] };
+  }
+}

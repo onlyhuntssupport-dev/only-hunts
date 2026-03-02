@@ -1,94 +1,67 @@
 
-import Image from 'next/image';
 import Link from 'next/link';
-import { ShieldCheck, Target } from 'lucide-react';
-import { Hunt } from '@/lib/validations/hunt';
-import { Badge } from '../ui/badge';
-import { Button } from '../ui/button';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
-// This is a simplification for the prototype. In a real app,
-// this would come from an API or a central config file.
-const USD_TO_ZAR_RATE = 18.5;
-
-interface HuntProps {
-  hunt: Hunt;
-  currency: 'USD' | 'ZAR';
+interface HuntCardProps {
+  hunt: {
+    id: string;
+    title: string;
+    description: string;
+    basePrice: number;
+    province: string;
+    species: string[];
+    imageUrl?: string;
+  };
 }
 
-export function HuntCard({ hunt, currency }: HuntProps) {
-  let displayPrice = hunt.basePrice;
-  let displayCurrency = hunt.baseCurrency;
-
-  // Convert price if the requested currency is different from the base currency
-  if (currency !== hunt.baseCurrency) {
-    if (hunt.baseCurrency === 'USD' && currency === 'ZAR') {
-      displayPrice = hunt.basePrice * USD_TO_ZAR_RATE;
-      displayCurrency = 'ZAR';
-    } else if (hunt.baseCurrency === 'ZAR' && currency === 'USD') {
-      displayPrice = hunt.basePrice / USD_TO_ZAR_RATE;
-      displayCurrency = 'USD';
-    }
-    // Note: No conversion for EUR is implemented in this example.
-  }
-
-  const price = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: displayCurrency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(displayPrice);
+export function HuntCard({ hunt }: HuntCardProps) {
+  // Take the first 3 species for display
+  const speciesList = hunt.species.slice(0, 3);
 
   return (
-    <article className="group flex flex-col overflow-hidden rounded-lg border bg-card shadow-sm transition-shadow duration-300 hover:shadow-lg h-full">
-      <div className="relative aspect-[4/3] w-full overflow-hidden">
-        <Link href={`/hunts/${hunt.id}`}>
-            <Image
-              src={hunt.imageUrl}
-              alt={hunt.title}
-              fill
-              className="object-cover transition-transform duration-300 group-hover:scale-105"
-              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-              priority={false}
-              data-ai-hint={hunt.imageHint}
-            />
-        </Link>
-        {hunt.isVerified && (
-          <Badge variant="default" className="absolute top-3 left-3 gap-1.5">
-            <ShieldCheck size={12} />
-            Verified
-          </Badge>
-        )}
+    <div className="group flex flex-col bg-card border rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 h-full">
+      {/* Image Container */}
+      <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
+        <img 
+          src={hunt.imageUrl || 'https://images.unsplash.com/photo-1588612143003-88da87c71d64?q=80&w=800&auto=format&fit=crop'} 
+          alt={hunt.title}
+          className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-300"
+        />
+        <div className="absolute top-3 right-3 bg-background/90 backdrop-blur-sm px-3 py-1 rounded-full text-sm font-bold text-foreground">
+          ${hunt.basePrice.toLocaleString()}
+        </div>
       </div>
 
-      <div className="p-4 flex flex-col flex-grow">
-        <p className="text-sm text-muted-foreground">{hunt.outfitterName}</p>
-        <h3 className="text-lg font-bold font-headline text-primary mt-1 flex-grow">
-          <Link href={`/hunts/${hunt.id}`}>{hunt.title}</Link>
+      {/* Content Container */}
+      <div className="flex flex-col flex-1 p-5">
+        <div className="text-xs font-medium text-primary mb-2 uppercase tracking-wider">
+          {hunt.province}
+        </div>
+        
+        <h3 className="font-headline font-bold text-lg mb-2 line-clamp-2 flex-grow">
+          {hunt.title}
         </h3>
         
-        <div className="mt-3 flex flex-wrap gap-1">
-          {hunt.species.slice(0, 3).map((s) => (
-            <Badge key={s} variant="secondary" className='font-normal'>
-              {s}
+        <div className="flex flex-wrap gap-2 mb-4">
+          {speciesList.map((species, i) => (
+            <Badge key={i} variant="secondary" className="font-normal">
+              {species}
             </Badge>
           ))}
           {hunt.species.length > 3 && (
-            <Badge variant="secondary" className='font-normal'>
+            <Badge variant="secondary" className="font-normal">
               +{hunt.species.length - 3} more
             </Badge>
           )}
         </div>
 
-        <div className="mt-4 pt-4 flex items-center justify-between border-t">
-          <div>
-            <p className="text-xs text-muted-foreground">From</p>
-            <span className="text-xl font-bold text-primary">{price}</span>
-          </div>
-           <Button asChild size="sm">
-            <Link href={`/hunts/${hunt.id}`}>View Details</Link>
-          </Button>
-        </div>
+        <Button asChild variant="outline" className="w-full group-hover:bg-primary group-hover:text-primary-foreground transition-colors mt-auto">
+          <Link href={`/hunts/${hunt.id}`} className="w-full">
+            View Details
+          </Link>
+        </Button>
       </div>
-    </article>
+    </div>
   );
 }
