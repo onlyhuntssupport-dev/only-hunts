@@ -1,4 +1,3 @@
-
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { HuntCard } from '@/components/marketplace/HuntCard';
