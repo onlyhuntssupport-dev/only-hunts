@@ -130,7 +130,7 @@ export async function getHuntById(id: string) {
   
       const data = docSnap.data();
       // Ensure Timestamps are serialized for the client
-      const serializableData: { [key: string]: any } = { id: docSnap.id };
+      const serializableData: { [key:string]: any } = { id: docSnap.id };
       for (const key in data) {
           if (data[key] instanceof firestore.Timestamp) {
               serializableData[key] = data[key].toDate().toISOString();
