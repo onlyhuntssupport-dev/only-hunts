@@ -1,30 +1,40 @@
 'use server';
 
 import { adminDb } from '@/lib/firebase/admin';
-import { z } from 'zod';
+import { revalidatePath } from 'next/cache';
+import type { Hunt } from '@/lib/validations/hunt';
 
-const HuntSchema = z.object({
-  title: z.string().min(5, 'Title must be at least 5 characters'),
-  description: z.string().min(20, 'Please provide a detailed description'),
-  price: z.coerce.number().min(1, 'Price must be greater than 0'),
-  location: z.string().min(2, 'Location is required'),
-  species: z.string().min(2, 'List at least one species'),
-  status: z.enum(['draft', 'published', 'active']),
-  imageUrl: z.string().optional(),
-});
+// This is a simplified type for the incoming form data,
+// as the full Hunt type includes server-generated fields.
+// The species is an array, matching the form's output.
+interface HuntCreationData {
+  title: string;
+  description: string;
+  basePrice: number;
+  baseCurrency: 'USD' | 'EUR' | 'ZAR';
+  province: string;
+  species: string[];
+  imageUrl: string;
+  outfitterName: string;
+}
 
-export type HuntFormData = z.infer<typeof HuntSchema>;
-
-export async function createHunt(data: HuntFormData, outfitterId: string) {
+export async function createHunt(data: HuntCreationData, outfitterId: string) {
   try {
-    const parsedData = HuntSchema.parse(data);
-    const payload = {
-      ...parsedData,
+    // Data is assumed to be validated by the form before calling this action.
+    const payload: Omit<Hunt, 'id' | 'createdAt' | 'approvedAt' | 'lastViewedAt'> = {
+      ...data,
       outfitterId,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      isVerified: false, // Outfitters themselves need verification first
+      status: 'pending', // All new hunts require admin approval
     };
-    const docRef = await adminDb.collection('hunts').add(payload);
+
+    const docRef = await adminDb.collection('hunts').add({
+      ...payload,
+      createdAt: new Date().toISOString(),
+    });
+    
+    revalidatePath('/outfitter/dashboard/hunts'); // Revalidate the hunts table
+    revalidatePath('/'); // Revalidate homepage feed
     return { success: true, id: docRef.id };
   } catch (error) {
     console.error('Error creating hunt:', error);
@@ -51,6 +61,8 @@ export async function getOutfitterHunts(outfitterId: string) {
 export async function deleteHunt(huntId: string) {
   try {
     await adminDb.collection('hunts').doc(huntId).delete();
+    revalidatePath('/outfitter/dashboard/hunts');
+    revalidatePath('/');
     return { success: true };
   } catch (error) {
     console.error('Error deleting hunt:', error);
@@ -62,8 +74,11 @@ export async function getPublishedHunts() {
   try {
     const snapshot = await adminDb
       .collection('hunts')
-      .where('status', 'in', ['published', 'active']) 
+      // Only show hunts that are both active and from a verified outfitter
+      .where('status', '==', 'active')
+      .where('isVerified', '==', true)
       .orderBy('createdAt', 'desc')
+      .limit(20)
       .get();
       
     const hunts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));

@@ -1,24 +1,30 @@
-// Updated private key logic
-const rawKey = process.env.FIREBASE_PRIVATE_KEY;
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
 
-const formatPrivateKey = (key: string | undefined) => {
-  if (!key) return undefined;
-  // 1. Remove any accidental wrapping quotes
-  let formatted = key.replace(/^['"]|['"]$/g, '');
-  // 2. Handle escaped newlines
-  formatted = formatted.replace(/\\n/g, '\n');
-  // 3. If it's all on one line without newlines, the SDK will fail. 
-  // This ensures the header and footer are on their own lines.
-  if (!formatted.includes('\n') && formatted.includes('-----BEGIN PRIVATE KEY-----')) {
-     formatted = formatted
-       .replace('-----BEGIN PRIVATE KEY-----', '-----BEGIN PRIVATE KEY-----\n')
-       .replace('-----END PRIVATE KEY-----', '\n-----END PRIVATE KEY-----');
-  }
-  return formatted;
-};
+// Debugging check to ensure env vars are actually loading
+if (!process.env.FIREBASE_PROJECT_ID) {
+  console.error('CRITICAL ERROR: FIREBASE_PROJECT_ID is missing. Check your .env.local file and restart the server.');
+}
 
-const serviceAccount = {
+const firebaseAdminConfig = {
   projectId: process.env.FIREBASE_PROJECT_ID,
   clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-  privateKey: formatPrivateKey(rawKey),
+  privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
 };
+
+// Initialize the app only if it doesn't already exist
+if (!getApps().length) {
+  try {
+    initializeApp({
+      credential: cert(firebaseAdminConfig),
+    });
+    console.log('✅ Firebase Admin Initialized Successfully');
+  } catch (error) {
+    console.error('❌ Firebase Admin Initialization Error:', error);
+  }
+}
+
+// Export the modular instances
+export const adminDb = getFirestore();
+export const adminAuth = getAuth();

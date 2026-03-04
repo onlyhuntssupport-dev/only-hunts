@@ -80,7 +80,7 @@ export default function HuntCreator({ outfitterId, outfitterName }: { outfitterI
         imageUrl,
       };
 
-      const result = await createHunt(finalHuntData);
+      const result = await createHunt(finalHuntData, outfitterId);
 
       if (result.success) {
         toast({ title: 'Hunt Submitted!', description: `${finalHuntData.title} is now pending approval.` });
