@@ -1,32 +1,35 @@
-
 'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { signInWithGoogle } from '@/lib/firebase/auth';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth, signInWithGoogle } from '@/lib/firebase/auth';
 import { syncUserProfile } from '@/app/actions/users';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { useToast } from '@/hooks/use-toast';
 import type { UserRole } from '@/types/auth';
 
 export default function AuthForm() {
   const [isLogin, setIsLogin] = useState(true);
   const [role, setRole] = useState<UserRole>('HUNTER');
   const [isLoading, setIsLoading] = useState(false);
+  const [isEmailLoading, setIsEmailLoading] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
+  const { toast } = useToast();
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
   const handleGoogleAuth = async () => {
     setIsLoading(true);
     setError('');
     
     try {
-      // 1. Authenticate with Firebase Client
       const user = await signInWithGoogle();
       if (!user) throw new Error('Authentication failed');
 
-      // 2. Sync profile to Firestore securely via Server Action
-      // On login, we pass the existing role (or a default) which is ignored by the server
-      // in favor of the database record. On signup, we pass the selected role.
       const syncResult = await syncUserProfile({
         uid: user.uid,
         email: user.email,
@@ -37,7 +40,6 @@ export default function AuthForm() {
 
       if (!syncResult.success) throw new Error(syncResult.error || 'Profile sync failed');
 
-      // 3. Route based on the verified role from the database
       if (syncResult.role === 'OUTFITTER') {
         router.push('/outfitter/dashboard');
       } else if (syncResult.role === 'ADMIN') {
@@ -46,12 +48,57 @@ export default function AuthForm() {
       else {
         router.push('/hunts');
       }
-      router.refresh(); // Ensure server components re-render with new auth state
+      router.refresh(); 
 
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'An error occurred during sign in.');
+    } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleEmailLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setIsEmailLoading(true);
+
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      const idToken = await user.getIdToken();
+
+      await fetch('/api/auth/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken }),
+      });
+      
+      const tokenResult = await user.getIdTokenResult();
+      const role = tokenResult.claims.role;
+
+      toast({ title: "Login Successful", description: "Welcome back!" });
+
+      if (role === 'ADMIN') {
+        router.push('/admin');
+      } else if (role === 'OUTFITTER') {
+        router.push('/outfitter/dashboard');
+      } else {
+        router.push('/hunts');
+      }
+      
+      router.refresh();
+
+    } catch (err: any) {
+      console.error('Login error:', err.code);
+      if (['auth/invalid-credential', 'auth/user-not-found', 'auth/wrong-password'].includes(err.code)) {
+         setError('Invalid email or password. Please try again.');
+      } else {
+        setError('An unexpected error occurred. Please try again.');
+      }
+    } finally {
+      setIsEmailLoading(false);
     }
   };
 
@@ -98,18 +145,56 @@ export default function AuthForm() {
         </div>
       )}
 
-      {error && <p className="text-destructive text-sm mb-4 text-center">{error}</p>}
-
       <div className="space-y-4 mt-4">
         <Button 
           onClick={handleGoogleAuth} 
-          disabled={isLoading} 
+          disabled={isLoading || isEmailLoading} 
           variant="outline" 
           className="w-full py-6 text-md font-medium flex items-center justify-center gap-2"
         >
           {isLoading ? 'Connecting...' : 'Continue with Google'}
         </Button>
       </div>
+
+      {isLogin && (
+        <>
+          <div className="my-4 flex items-center before:flex-1 before:border-t before:border-muted after:flex-1 after:border-t after:border-muted">
+            <p className="text-center text-sm text-muted-foreground mx-4">OR</p>
+          </div>
+
+          <form onSubmit={handleEmailLogin} className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium sr-only">Email address</label>
+              <Input 
+                type="email" 
+                placeholder="Email address" 
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                disabled={isEmailLoading}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium sr-only">Password</label>
+              <Input 
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                disabled={isEmailLoading}
+              />
+            </div>
+
+            <Button type="submit" className="w-full py-6" disabled={isEmailLoading || isLoading}>
+              {isEmailLoading ? 'Signing in...' : 'Sign in with Email'}
+            </Button>
+          </form>
+        </>
+      )}
+
+      {error && <p className="text-destructive text-sm mt-4 text-center">{error}</p>}
     </div>
   );
 }
