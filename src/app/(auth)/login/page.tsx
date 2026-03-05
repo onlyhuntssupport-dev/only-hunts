@@ -20,11 +20,30 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      // 1. Sign in with Firebase Client Auth
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      
+      // 2. Grab the JWT token
+      const idToken = await userCredential.user.getIdToken();
+      
+      // 3. Send token to our SECURE API route to create the session cookie
+      await fetch('/api/auth/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken }),
+      });
+      
+      // 4. Redirect to secure dashboard
       router.push('/dashboard');
+      router.refresh();
+
     } catch (err: any) {
       console.error('Login error:', err);
-      setError('Invalid email or password. Please try again.');
+      if (['auth/invalid-credential', 'auth/user-not-found', 'auth/wrong-password'].includes(err.code)) {
+        setError('Invalid email or password. Please try again.');
+      } else {
+        setError('An unexpected error occurred. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
