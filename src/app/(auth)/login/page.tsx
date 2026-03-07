@@ -1,9 +1,11 @@
+
 'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase/client';
+import { createSession } from '@/app/actions/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -26,12 +28,8 @@ export default function LoginPage() {
       // 2. Grab the JWT token
       const idToken = await userCredential.user.getIdToken();
       
-      // 3. Send token to our SECURE API route to create the session cookie
-      await fetch('/api/auth/session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken }),
-      });
+      // 3. Send token to our Server Action to securely mint the cookie
+      await createSession(idToken);
       
       // 4. Redirect to secure dashboard
       router.push('/dashboard');
