@@ -1,43 +1,34 @@
 'use server';
 
-import { adminAuth, adminDb } from '@/lib/firebase/admin';
-import { revalidatePath } from 'next/cache';
+import { adminAuth } from '@/lib/firebase/admin';
 import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
 
-// 1. Missing createSession function added
-export async function createSession(idToken: string) {
-  const cookieStore = await cookies();
-  
-  cookieStore.set('session', idToken, {
-    maxAge: 60 * 60 * 24 * 5, // 5 days
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    path: '/',
-  });
-}
-
-// 2. Your existing role management function (untouched)
-export async function setUserRole(uid: string, role: 'HUNTER' | 'OUTFITTER') {
+export async function login(idToken: string) {
   try {
-    await adminAuth.setCustomUserClaims(uid, { role });
+    // Set session expiration to 7 days (in milliseconds for Firebase, seconds for Cookies)
+    const expiresIn = 60 * 60 * 24 * 7 * 1000; 
+    const sessionCookie = await adminAuth.createSessionCookie(idToken, { expiresIn });
 
-    await adminDb.collection('users').doc(uid).update({
-      role: role,
-      updatedAt: new Date().toISOString(),
+    const cookieStore = await cookies();
+    
+    // Set the cookie in the browser
+    cookieStore.set('session', sessionCookie, {
+      maxAge: expiresIn / 1000, // 7 days in seconds
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      sameSite: 'lax',
     });
 
-    revalidatePath('/'); 
     return { success: true };
-  } catch (error) {
-    console.error("Failed to set user role:", error);
-    return { success: false, error: "Authorization failed" };
+  } catch (error: any) {
+    console.error('Login error:', error);
+    return { error: error.message || 'Failed to create session' };
   }
 }
 
-// 3. Fixed Next.js 15 async cookie bug
-export async function serverLogOut() {
+export async function logout() {
   const cookieStore = await cookies();
   cookieStore.delete('session');
-  redirect('/login');
+  return { success: true };
 }
