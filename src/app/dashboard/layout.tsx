@@ -1,8 +1,7 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { adminAuth } from '@/lib/firebase/admin';
-import { AppSidebar } from '@/components/sidebar';
-import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
+import Link from 'next/link';
 
 export default async function DashboardLayout({
   children,
@@ -12,39 +11,38 @@ export default async function DashboardLayout({
   const cookieStore = await cookies();
   const sessionCookie = cookieStore.get('session')?.value;
 
-  // 1. If no cookie exists, send back to login
+  // 1. Check if session exists
   if (!sessionCookie) {
     redirect('/login');
   }
 
-  let decodedToken = null;
-
   try {
-    // 2. FIX: Use verifySessionCookie instead of verifyIdToken
-    // The second parameter 'true' checks if the session was revoked
-    decodedToken = await adminAuth.verifySessionCookie(sessionCookie, true);
+    // 2. Verify the 7-day session cookie
+    await adminAuth.verifySessionCookie(sessionCookie, true);
   } catch (error) {
     console.error("Token verification failed:", error);
-    // If verification fails (expired or invalid), clear cookie and redirect
-    redirect('/login');
-  }
-
-  // 3. Security Check: Ensure only Admins can access the dashboard
-  if (!decodedToken || decodedToken.role !== 'ADMIN') {
-    // Optional: You could redirect to a "unauthorized" page instead
     redirect('/login');
   }
 
   return (
-    <SidebarProvider>
-      <div className="flex min-h-screen w-full bg-background">
-        <AppSidebar />
-        <SidebarInset>
-          <main className="flex-1 p-6 lg:p-10">
-            {children}
-          </main>
-        </SidebarInset>
-      </div>
-    </SidebarProvider>
+    <div className="flex flex-col min-h-screen w-full bg-background">
+      {/* Super Admin Navigation Bar */}
+      <header className="sticky top-0 z-10 flex h-16 items-center gap-8 border-b bg-card px-6 shadow-sm">
+        <div className="font-bold text-lg tracking-tight text-primary">Admin Portal</div>
+        <nav className="flex items-center gap-6">
+          <Link href="/dashboard" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+            Overview
+          </Link>
+          <Link href="/dashboard/outfitters" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+            Manage Outfitters
+          </Link>
+        </nav>
+      </header>
+
+      {/* Main Content Area */}
+      <main className="flex-1 p-6 lg:p-10 w-full">
+        {children}
+      </main>
+    </div>
   );
 }

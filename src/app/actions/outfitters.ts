@@ -1,9 +1,8 @@
 'use server';
 
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
-import { getStorage } from 'firebase-admin/storage';
-import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
+import * as admin from 'firebase-admin';
 
 export async function createOutfitter(formData: FormData) {
   try {
@@ -11,86 +10,83 @@ export async function createOutfitter(formData: FormData) {
     const sessionCookie = cookieStore.get('session')?.value;
 
     if (!sessionCookie) {
-      return { error: 'Unauthorized' };
+      return { error: 'Unauthorized: No active session found.' };
     }
 
-    // Securely verify that the person making this request is an Admin
-    const decodedToken = await adminAuth.verifyIdToken(sessionCookie);
-    if (decodedToken.admin !== true && decodedToken.role !== 'ADMIN') {
-      return { error: 'Unauthorized: Admin access required' };
-    }
+    const decodedClaims = await adminAuth.verifySessionCookie(sessionCookie, true);
 
-    const email = formData.get('email') as string;
-    const password = formData.get('password') as string;
     const name = formData.get('name') as string;
     const owner = formData.get('owner') as string;
+    const email = formData.get('email') as string;
+    const password = formData.get('password') as string;
     const permitFile = formData.get('permit') as File;
 
-    if (!email || !password || !name || !owner) {
-      return { error: 'All text fields are required.' };
+    if (!name || !owner || !email || !password || !permitFile) {
+      return { error: 'Missing required fields.' };
     }
 
-    // Server-side enforcement of the permit file
-    if (!permitFile || permitFile.size === 0) {
-      return { error: 'Outfitter Permit document is strictly required for verification.' };
+    // Step 1: Attempt to create the Auth User
+    let userRecord;
+    try {
+      userRecord = await adminAuth.createUser({
+        email,
+        password,
+        displayName: owner,
+      });
+    } catch (authError: any) {
+      console.error('Auth Creation Error:', authError);
+      return { error: authError.message || 'Failed to create auth user. Email may be in use.' };
     }
 
-    // 1. Create the user in Firebase Auth
-    const userRecord = await adminAuth.createUser({
-      email,
-      password,
-      displayName: name,
-    });
+    // Step 2 & 3: Attempt Storage Upload and Database Write
+    try {
+      const bucketName = process.env.FIREBASE_STORAGE_BUCKET || `${process.env.FIREBASE_PROJECT_ID}.appspot.com`;
+      const bucket = admin.storage().bucket(bucketName);
+      
+      const buffer = Buffer.from(await permitFile.arrayBuffer());
+      
+      const safeFileName = permitFile.name.replace(/[^a-zA-Z0-9.\-_]/g, '');
+      const fileName = `permits/${userRecord.uid}_${safeFileName}`;
+      const file = bucket.file(fileName);
+      
+      await file.save(buffer, {
+        metadata: { contentType: permitFile.type },
+      });
 
-    const uid = userRecord.uid;
+      const permitUrl = await file.getSignedUrl({
+        action: 'read',
+        expires: '01-01-2100', 
+      });
 
-    // 2. Set the Custom Claim for Role-Based Access Control
-    await adminAuth.setCustomUserClaims(uid, { role: 'OUTFITTER' });
+      await adminDb.collection('users').doc(userRecord.uid).set({
+        name,
+        owner,
+        email,
+        role: 'OUTFITTER',
+        status: 'PENDING',
+        permitUrl: permitUrl[0],
+        createdBy: decodedClaims.uid,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
 
-    // 3. Securely Upload the Permit to Firebase Storage
-    // We create a buffer from the file and upload it to a private folder
-    const buffer = Buffer.from(await permitFile.arrayBuffer());
-    const fileExtension = permitFile.name.split('.').pop();
-    const storagePath = `secure_permits/${uid}_permit.${fileExtension}`;
-    
-    // Get the default bucket configured in your Firebase Admin setup
-    const bucket = getStorage().bucket();
-    const file = bucket.file(storagePath);
-    
-    await file.save(buffer, { 
-      contentType: permitFile.type,
-      metadata: {
-        metadata: {
-          uploadedByAdmin: decodedToken.uid,
-          ownerId: uid
-        }
+      return { success: true };
+      
+    } catch (processError: any) {
+      // ROLLBACK: If Storage or Firestore fails, delete the orphaned Auth account
+      console.error('Process Error. Rolling back user creation...', processError);
+      
+      try {
+        await adminAuth.deleteUser(userRecord.uid);
+        console.log(`Successfully rolled back (deleted) user: ${userRecord.uid}`);
+      } catch (rollbackError) {
+        console.error('CRITICAL: Failed to rollback user after process error:', rollbackError);
       }
-    });
 
-    // 4. Create the outfitter's database profile using the secure internal path
-    await adminDb.collection('users').doc(uid).set({
-      email,
-      name,
-      owner,
-      role: 'OUTFITTER',
-      status: 'PENDING',
-      permitPath: storagePath, // Admin-only path, not a public URL
-      dateApplied: new Date().toISOString().split('T')[0],
-      createdAt: new Date().toISOString(),
-    });
-
-    // 5. Force Next.js to refresh the table UI
-    revalidatePath('/dashboard/outfitters');
-    
-    return { success: true };
-  } catch (error: any) {
-    console.error('Error creating outfitter:', error);
-    
-    // Check if the error is related to a missing Storage Bucket configuration
-    if (error.message && error.message.includes('bucket')) {
-      return { error: 'Firebase Storage bucket is not configured in your admin environment.' };
+      return { error: `System Error: ${processError.message || 'Failed to process outfitter data.'}` };
     }
     
-    return { error: error.message || 'Failed to create outfitter' };
+  } catch (fatalError: any) {
+    console.error('Server Action Fatal Crash:', fatalError);
+    return { error: fatalError.message || 'An unexpected server error occurred.' };
   }
 }
