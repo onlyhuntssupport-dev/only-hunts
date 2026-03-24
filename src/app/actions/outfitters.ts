@@ -1,92 +1,72 @@
-'use server';
+"use server";
 
-import { adminAuth, adminDb } from '@/lib/firebase/admin';
-import { cookies } from 'next/headers';
-import * as admin from 'firebase-admin';
+import { adminDb, adminAuth } from "@/lib/firebase/admin";
+import { revalidatePath } from "next/cache";
+
+export async function getOutfitters() {
+  try {
+    const snap = await adminDb.collection("outfitters").orderBy("createdAt", "desc").get();
+    const outfitters = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    return { success: true, data: outfitters };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function updateOutfitterStatus(id: string, status: string, rejectionReason?: string) {
+  try {
+    const updateData: any = { status, updatedAt: new Date().toISOString() };
+    if (rejectionReason) updateData.rejectionReason = rejectionReason;
+    
+    await adminDb.collection("outfitters").doc(id).update(updateData);
+    revalidatePath("/dashboard/outfitters");
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
 
 export async function createOutfitter(formData: FormData) {
   try {
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get('session')?.value;
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
+    const name = formData.get("name") as string;
+    const permitUrl = formData.get("permitUrl") as string;
 
-    if (!sessionCookie) {
-      return { error: 'Unauthorized: No active session found.' };
-    }
+    // 1. Create Firebase Auth User
+    const userRecord = await adminAuth.createUser({
+      email,
+      password,
+      displayName: name,
+    });
 
-    const decodedClaims = await adminAuth.verifySessionCookie(sessionCookie, true);
+    // 2. Create Firestore Document linked to Auth UID
+    await adminDb.collection("outfitters").doc(userRecord.uid).set({
+      name,
+      email,
+      permitUrl,
+      status: "PENDING",
+      totalListings: 0,
+      createdAt: new Date().toISOString(),
+    });
 
-    const name = formData.get('name') as string;
-    const owner = formData.get('owner') as string;
-    const email = formData.get('email') as string;
-    const password = formData.get('password') as string;
-    const permitFile = formData.get('permit') as File;
+    revalidatePath("/dashboard/outfitters");
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
 
-    if (!name || !owner || !email || !password || !permitFile) {
-      return { error: 'Missing required fields.' };
-    }
-
-    // Step 1: Attempt to create the Auth User
-    let userRecord;
-    try {
-      userRecord = await adminAuth.createUser({
-        email,
-        password,
-        displayName: owner,
-      });
-    } catch (authError: any) {
-      console.error('Auth Creation Error:', authError);
-      return { error: authError.message || 'Failed to create auth user. Email may be in use.' };
-    }
-
-    // Step 2 & 3: Attempt Storage Upload and Database Write
-    try {
-      const bucketName = process.env.FIREBASE_STORAGE_BUCKET || `${process.env.FIREBASE_PROJECT_ID}.appspot.com`;
-      const bucket = admin.storage().bucket(bucketName);
-      
-      const buffer = Buffer.from(await permitFile.arrayBuffer());
-      
-      const safeFileName = permitFile.name.replace(/[^a-zA-Z0-9.\-_]/g, '');
-      const fileName = `permits/${userRecord.uid}_${safeFileName}`;
-      const file = bucket.file(fileName);
-      
-      await file.save(buffer, {
-        metadata: { contentType: permitFile.type },
-      });
-
-      const permitUrl = await file.getSignedUrl({
-        action: 'read',
-        expires: '01-01-2100', 
-      });
-
-      await adminDb.collection('users').doc(userRecord.uid).set({
-        name,
-        owner,
-        email,
-        role: 'OUTFITTER',
-        status: 'PENDING',
-        permitUrl: permitUrl[0],
-        createdBy: decodedClaims.uid,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-
-      return { success: true };
-      
-    } catch (processError: any) {
-      // ROLLBACK: If Storage or Firestore fails, delete the orphaned Auth account
-      console.error('Process Error. Rolling back user creation...', processError);
-      
-      try {
-        await adminAuth.deleteUser(userRecord.uid);
-        console.log(`Successfully rolled back (deleted) user: ${userRecord.uid}`);
-      } catch (rollbackError) {
-        console.error('CRITICAL: Failed to rollback user after process error:', rollbackError);
-      }
-
-      return { error: `System Error: ${processError.message || 'Failed to process outfitter data.'}` };
-    }
+export async function deleteAdminAccount(id: string) {
+  try {
+    // 1. Delete from Firebase Auth
+    await adminAuth.deleteUser(id).catch(() => console.log("User not in auth"));
+    // 2. Delete from Firestore
+    await adminDb.collection("outfitters").doc(id).delete();
     
-  } catch (fatalError: any) {
-    console.error('Server Action Fatal Crash:', fatalError);
-    return { error: fatalError.message || 'An unexpected server error occurred.' };
+    revalidatePath("/dashboard/outfitters");
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
   }
 }

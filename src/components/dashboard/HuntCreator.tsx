@@ -1,234 +1,284 @@
+"use client";
 
-'use client';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { storage } from "@/lib/firebase/client";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { createHuntListing } from "@/app/actions/hunts";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Loader2, UploadCloud, X, DollarSign } from "lucide-react";
 
-import { useState } from 'react';
-import { useForm, Controller } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { Upload, DollarSign, Loader2, ArrowLeft } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { uploadHuntImage } from '@/lib/firebase/storage';
-import { createHunt } from '@/app/actions/hunts';
-import { useRouter } from 'next/navigation';
-import { Textarea } from '../ui/textarea';
+interface HuntCreatorProps {
+  outfitterId: string;
+  outfitterName: string;
+}
 
-// Schemas for each step for clear validation
-const step1Schema = z.object({
-  title: z.string().min(5, "Title must be at least 5 characters."),
-  description: z.string().min(20, "Please provide a description of at least 20 characters."),
-  basePrice: z.coerce.number().positive("Price must be a positive number."),
-  baseCurrency: z.enum(['USD', 'EUR', 'ZAR']),
-});
+// --- CONSTANTS FOR DROPDOWNS ---
+const SA_PROVINCES = [
+  "Eastern Cape", "Free State", "Gauteng", "KwaZulu-Natal", 
+  "Limpopo", "Mpumalanga", "North West", "Northern Cape", "Western Cape"
+];
 
-const step2Schema = z.object({
-  province: z.enum(['Limpopo', 'Eastern Cape', 'North West', 'Free State', 'Mpumalanga', 'Northern Cape', 'KwaZulu-Natal']),
-  species: z.string().min(3, "Enter at least one species.").transform(val => val.split(',').map(s => s.trim()).filter(Boolean)),
-});
+const SA_PLAINS_GAME = [
+  "Blesbok", "Blue Wildebeest", "Black Wildebeest", "Buffalo", "Bushbuck",
+  "Eland", "Gemsbok (Oryx)", "Giraffe", "Hartebeest (Red)", "Impala", 
+  "Kudu", "Nyala", "Ostrich", "Roan Antelope", "Sable Antelope", 
+  "Springbok", "Steenbok", "Tsesebe", "Waterbuck", "Warthog", "Zebra"
+];
 
-export default function HuntCreator({ outfitterId, outfitterName }: { outfitterId: string, outfitterName: string }) {
-  const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState<any>({
-    outfitterId,
-    outfitterName
-  });
-  const [file, setFile] = useState<File | null>(null);
-  const [isPublishing, setIsPublishing] = useState(false);
-  const { toast } = useToast();
+const DURATIONS = Array.from({ length: 20 }, (_, i) => i + 1); // [1, 2, ..., 20]
+
+export default function HuntCreator({ outfitterId, outfitterName }: HuntCreatorProps) {
   const router = useRouter();
-
-  const { control: control1, handleSubmit: handleSubmit1, formState: { errors: errors1 } } = useForm({
-    resolver: zodResolver(step1Schema),
-    defaultValues: { title: formData.title || '', description: formData.description || '', basePrice: formData.basePrice || undefined, baseCurrency: formData.baseCurrency || 'USD' }
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [images, setImages] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  
+  // Updated state with default values for the dropdowns and slider
+  const [formData, setFormData] = useState({
+    title: "",
+    primarySpecies: SA_PLAINS_GAME[10], // Default to Kudu
+    price: 3500, // Default slider value
+    duration: 7, // Default to 7 days
+    location: SA_PROVINCES[4], // Default to Limpopo
+    description: "",
   });
 
-  const { control: control2, handleSubmit: handleSubmit2, formState: { errors: errors2 } } = useForm({
-    resolver: zodResolver(step2Schema),
-    defaultValues: { province: formData.province || 'Limpopo', species: formData.species ? formData.species.join(', ') : '' }
-  });
-  
-  const handleNextStep1 = (data: any) => {
-    setFormData({ ...formData, ...data });
-    setStep(2);
-  };
-  
-  const handleNextStep2 = (data: any) => {
-    setFormData({ ...formData, ...data });
-    setStep(3);
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData({ 
+      ...formData, 
+      [name]: name === "price" || name === "duration" ? Number(value) : value 
+    });
   };
 
-  const handleFinalSubmit = async () => {
-    if (!file) {
-      toast({ variant: 'destructive', title: 'Upload Required', description: 'Please select a cover image for the hunt.' });
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const newFiles = Array.from(e.target.files);
+      setImages((prev) => [...prev, ...newFiles]);
+      
+      const newPreviews = newFiles.map(file => URL.createObjectURL(file));
+      setImagePreviews((prev) => [...prev, ...newPreviews]);
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setImages(images.filter((_, i) => i !== index));
+    setImagePreviews(imagePreviews.filter((_, i) => i !== index));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (images.length === 0) {
+      setError("Please upload at least one image for your listing.");
       return;
     }
-    
-    setIsPublishing(true);
+
+    setLoading(true);
+    setError("");
+
     try {
-      const imageUrl = await uploadHuntImage(file, outfitterId);
-      
-      const finalHuntData = {
-        ...formData,
-        imageUrl,
+      // 1. Upload all images to Firebase Storage
+      const uploadedUrls = await Promise.all(
+        images.map(async (file) => {
+          const fileExt = file.name.split('.').pop();
+          const fileName = `hunts/${outfitterId}_${Date.now()}_${Math.random().toString(36).slice(2)}.${fileExt}`;
+          const storageRef = ref(storage, fileName);
+          await uploadBytes(storageRef, file);
+          return await getDownloadURL(storageRef);
+        })
+      );
+
+      // 2. Format data for the database
+      const huntData = {
+        title: formData.title,
+        outfitterName: outfitterName,
+        primarySpecies: formData.primarySpecies,
+        species: [formData.primarySpecies], // Start the array with the primary target
+        price: Number(formData.price),
+        duration: Number(formData.duration),
+        location: formData.location,
+        province: formData.location, // Save to both for legacy compatibility
+        description: formData.description,
+        images: uploadedUrls,
+        coverImage: uploadedUrls[0], // Set the first image as the cover
       };
 
-      const result = await createHunt(finalHuntData, outfitterId);
+      // 3. Save to Firestore via Server Action
+      const result = await createHuntListing(huntData, outfitterId);
 
       if (result.success) {
-        toast({ title: 'Hunt Submitted!', description: `${finalHuntData.title} is now pending approval.` });
-        router.push('/outfitter/dashboard');
-        router.refresh();
+        router.push("/outfitter/dashboard");
       } else {
-        throw new Error(result.error || 'Failed to create hunt.');
+        setError(result.error || "Failed to create listing. Ensure your account is ACTIVE.");
+        setLoading(false);
       }
-    } catch (error) {
-      console.error(error);
-      toast({ variant: 'destructive', title: 'Submission Failed', description: error instanceof Error ? error.message : 'An unknown error occurred.' });
-    } finally {
-      setIsPublishing(false);
+    } catch (err: any) {
+      console.error(err);
+      setError("An unexpected error occurred during upload.");
+      setLoading(false);
     }
   };
 
-  const provinces = ['Limpopo', 'Eastern Cape', 'North West', 'Free State', 'Mpumalanga', 'Northern Cape', 'KwaZulu-Natal'];
-
   return (
-    <div className="max-w-3xl bg-card rounded-lg border shadow-sm overflow-hidden">
-      <div className="p-6 border-b flex items-center justify-between">
+    <form onSubmit={handleSubmit} className="space-y-8 bg-white p-6 md:p-8 rounded-xl border border-kalahari/30 shadow-sm max-w-4xl mx-auto">
+      {error && (
+        <div className="p-4 bg-red-50 text-red-800 border border-red-200 rounded-md text-sm font-bold">
+          {error}
+        </div>
+      )}
+
+      {/* Basic Info */}
+      <div className="space-y-6">
+        <h2 className="text-2xl font-bold font-headline text-olive dark:text-off-white border-b-2 border-kalahari/30 pb-3">Package Details</h2>
+        
         <div>
-            <h2 className="text-xl font-bold font-headline">Create New Hunt Package</h2>
-            <p className="text-muted-foreground text-sm">Step {step} of 3</p>
+          <label className="block text-sm font-bold text-olive dark:text-off-white mb-1.5">Listing Title</label>
+          <Input 
+            name="title" 
+            required 
+            value={formData.title} 
+            onChange={handleChange} 
+            placeholder="e.g. 7-Day Premium Kudu & Gemsbok Safari" 
+            className="h-12 border-kalahari/50 focus-visible:ring-olive text-lg" 
+          />
         </div>
-        {step > 1 && (
-            <Button variant="ghost" onClick={() => setStep(step - 1)} disabled={isPublishing}>
-                <ArrowLeft className="mr-2" /> Back
-            </Button>
-        )}
-      </div>
 
-      <div className="px-6 py-4">
-        <div className="w-full bg-muted rounded-full h-2.5 mb-6">
-          <div className="bg-primary h-2.5 rounded-full" style={{ width: `${(step / 3) * 100}%`, transition: 'width 0.3s ease-in-out' }}></div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          
+          {/* Custom Select: Target Species */}
+          <div>
+            <label className="block text-sm font-bold text-olive dark:text-off-white mb-1.5">Primary Target Species</label>
+            <select
+              name="primarySpecies"
+              required
+              value={formData.primarySpecies}
+              onChange={handleChange}
+              className="flex h-12 w-full items-center justify-between rounded-md border border-kalahari/50 bg-white px-3 py-2 text-sm ring-offset-white focus:outline-none focus:ring-2 focus:ring-olive focus:ring-offset-2 text-olive dark:text-off-white font-medium"
+            >
+              {SA_PLAINS_GAME.map((animal) => (
+                <option key={animal} value={animal}>{animal}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Custom Select: Location */}
+          <div>
+            <label className="block text-sm font-bold text-olive dark:text-off-white mb-1.5">South African Province</label>
+            <select
+              name="location"
+              required
+              value={formData.location}
+              onChange={handleChange}
+              className="flex h-12 w-full items-center justify-between rounded-md border border-kalahari/50 bg-white px-3 py-2 text-sm ring-offset-white focus:outline-none focus:ring-2 focus:ring-olive focus:ring-offset-2 text-olive dark:text-off-white font-medium"
+            >
+              {SA_PROVINCES.map((prov) => (
+                <option key={prov} value={prov}>{prov}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Custom Select: Duration */}
+          <div>
+            <label className="block text-sm font-bold text-olive dark:text-off-white mb-1.5">Duration (Days)</label>
+            <select
+              name="duration"
+              required
+              value={formData.duration}
+              onChange={handleChange}
+              className="flex h-12 w-full items-center justify-between rounded-md border border-kalahari/50 bg-white px-3 py-2 text-sm ring-offset-white focus:outline-none focus:ring-2 focus:ring-olive focus:ring-offset-2 text-olive dark:text-off-white font-medium"
+            >
+              {DURATIONS.map((day) => (
+                <option key={day} value={day}>{day === 1 ? '1 Day' : `${day} Days`}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Custom Slider: Price in $500 increments */}
+          <div className="bg-kalahari/10 p-4 rounded-lg border border-kalahari/30">
+            <div className="flex justify-between items-center mb-4">
+              <label className="block text-sm font-bold text-olive dark:text-off-white">Total Price (USD)</label>
+              <div className="bg-olive text-kalahari font-bold px-3 py-1 rounded-md flex items-center shadow-sm">
+                <DollarSign className="h-4 w-4 mr-0.5" />
+                {formData.price.toLocaleString()}
+              </div>
+            </div>
+            <input 
+              type="range" 
+              name="price" 
+              min="500" 
+              max="50000" 
+              step="500" 
+              value={formData.price} 
+              onChange={handleChange} 
+              className="w-full h-2 bg-kalahari/40 rounded-lg appearance-none cursor-pointer accent-olive"
+            />
+            <div className="flex justify-between text-xs text-olive dark:text-off-white/60 mt-2 font-bold">
+              <span>$500</span>
+              <span>$50,000</span>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-bold text-olive dark:text-off-white mb-1.5">Package Description</label>
+          <Textarea 
+            name="description" 
+            required 
+            rows={6}
+            value={formData.description} 
+            onChange={handleChange} 
+            placeholder="Describe the accommodations, terrain, what's included (meals, trackers, transport), and what's excluded (flights, taxidermy)..."
+            className="text-base border-kalahari/50 focus-visible:ring-olive"
+          />
         </div>
       </div>
-      
-      <div className="p-6">
-        {step === 1 && (
-          <form onSubmit={handleSubmit1(handleNextStep1)} className="space-y-6 animate-in fade-in">
-            <Controller name="title" control={control1} render={({ field }) => (
-                <div>
-                    <label className="block text-sm font-medium mb-1">Hunt Title</label>
-                    <Input {...field} placeholder="e.g. 7-Day Trophy Kudu Safari" />
-                    {errors1.title && <p className="text-destructive text-xs mt-1">{errors1.title.message}</p>}
-                </div>
-            )} />
 
-             <Controller name="description" control={control1} render={({ field }) => (
-                <div>
-                    <label className="block text-sm font-medium mb-1">Hunt Description</label>
-                    <Textarea {...field} placeholder="Describe the lodge, the daily routine, what is included/excluded..." rows={5} />
-                    {errors1.description && <p className="text-destructive text-xs mt-1">{errors1.description.message}</p>}
-                </div>
-            )} />
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Controller name="basePrice" control={control1} render={({ field }) => (
-                    <div>
-                        <label className="block text-sm font-medium mb-1">Base Price</label>
-                        <div className="relative">
-                            <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-                            <Input {...field} type="number" step="1" placeholder="4500" className="pl-8" />
-                        </div>
-                        {errors1.basePrice && <p className="text-destructive text-xs mt-1">{errors1.basePrice.message}</p>}
-                    </div>
-                )} />
-                <Controller name="baseCurrency" control={control1} render={({ field }) => (
-                     <div>
-                        <label className="block text-sm font-medium mb-1">Currency</label>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <SelectTrigger><SelectValue placeholder="Select currency" /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="USD">USD ($)</SelectItem>
-                                <SelectItem value="EUR">EUR (€)</SelectItem>
-                                <SelectItem value="ZAR">ZAR (R)</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        {errors1.baseCurrency && <p className="text-destructive text-xs mt-1">{errors1.baseCurrency.message}</p>}
-                    </div>
-                )} />
-            </div>
-            
-            <Button type="submit" className="w-full">
-              Next: Species & Location
-            </Button>
-          </form>
-        )}
+      {/* Photos Section */}
+      <div className="space-y-4">
+        <h2 className="text-2xl font-bold font-headline text-olive dark:text-off-white border-b-2 border-kalahari/30 pb-3">Package Photos</h2>
+        <p className="text-sm text-olive dark:text-off-white/70 mb-4 font-medium">High-quality photos significantly increase booking rates. The first image will be your cover photo.</p>
         
-        {step === 2 && (
-            <form onSubmit={handleSubmit2(handleNextStep2)} className="space-y-6 animate-in fade-in">
-                <Controller name="province" control={control2} render={({ field }) => (
-                    <div>
-                        <label className="block text-sm font-medium mb-1">Province</label>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <SelectTrigger><SelectValue placeholder="Select a province" /></SelectTrigger>
-                            <SelectContent>
-                                {provinces.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                        {errors2.province && <p className="text-destructive text-xs mt-1">{errors2.province.message}</p>}
-                    </div>
-                )} />
-                
-                <Controller name="species" control={control2} render={({ field }) => (
-                    <div>
-                        <label className="block text-sm font-medium mb-1">Target Species</label>
-                        <Input {...field} placeholder="Kudu, Impala, Warthog" />
-                        <p className="text-xs text-muted-foreground mt-1">Enter a comma-separated list.</p>
-                        {errors2.species && <p className="text-destructive text-xs mt-1">{errors2.species.message}</p>}
-                    </div>
-                )} />
-                
-                <Button type="submit" className="w-full">
-                    Next: Upload Photo
-                </Button>
-            </form>
-        )}
-        
-        {step === 3 && (
-            <div className="space-y-6 animate-in fade-in">
-                <div>
-                    <label className="block text-sm font-medium mb-2">Cover Photo</label>
-                    <div className="border-2 border-dashed rounded-lg p-6 text-center bg-muted/50">
-                    <Input 
-                        type="file" 
-                        accept="image/jpeg, image/png, image/webp"
-                        onChange={(e) => setFile(e.target.files?.[0] || null)}
-                        className="w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
-                        disabled={isPublishing}
-                    />
-                     {file && <p className="text-xs text-muted-foreground mt-2">Selected: {file.name}</p>}
-                    </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+          {imagePreviews.map((url, index) => (
+            <div key={index} className="relative aspect-square rounded-lg border-2 border-kalahari/30 overflow-hidden group shadow-sm">
+              <img src={url} alt={`Preview ${index}`} className="w-full h-full object-cover" />
+              {index === 0 && (
+                <div className="absolute top-2 left-2 bg-kalahari text-olive dark:text-off-white text-[10px] font-bold px-2 py-0.5 rounded shadow-md uppercase tracking-wider">
+                  Cover
                 </div>
-
-                <Button 
-                    type="button" 
-                    onClick={handleFinalSubmit}
-                    disabled={isPublishing || !file}
-                    className="w-full"
-                >
-                    {isPublishing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    {isPublishing ? 'Submitting...' : 'Submit for Approval'}
-                </Button>
+              )}
+              <button 
+                type="button" 
+                onClick={() => removeImage(index)}
+                className="absolute top-2 right-2 bg-red-500/90 hover:bg-red-600 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-all shadow-md"
+              >
+                <X className="h-3 w-3" />
+              </button>
             </div>
-        )}
+          ))}
+          
+          <label className="aspect-square flex flex-col items-center justify-center border-2 border-dashed border-kalahari/50 rounded-lg bg-kalahari/5 hover:bg-kalahari/10 hover:border-kalahari cursor-pointer transition-colors">
+            <UploadCloud className="h-8 w-8 text-kalahari mb-2" />
+            <span className="text-sm font-bold text-olive dark:text-off-white/70">Upload Photos</span>
+            <input type="file" multiple accept="image/*" className="hidden" onChange={handleImageChange} />
+          </label>
+        </div>
       </div>
-    </div>
+
+      <div className="pt-8 border-t-2 border-kalahari/30 flex justify-end gap-4">
+        <Button type="button" variant="outline" onClick={() => router.back()} disabled={loading} className="h-12 px-6 font-bold border-kalahari text-olive dark:text-off-white hover:bg-kalahari/10">Cancel</Button>
+        <Button type="submit" disabled={loading} className="bg-olive hover:bg-olive/90 text-kalahari h-12 px-8 text-lg font-black shadow-md transition-all">
+          {loading ? (
+            <><Loader2 className="h-5 w-5 animate-spin mr-2" /> Uploading...</>
+          ) : (
+            "Submit for Approval"
+          )}
+        </Button>
+      </div>
+    </form>
   );
 }

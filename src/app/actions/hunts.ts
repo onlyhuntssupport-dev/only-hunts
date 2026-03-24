@@ -1,101 +1,157 @@
-'use server';
+"use server";
 
-import { adminDb } from '@/lib/firebase/admin';
-import { revalidatePath } from 'next/cache';
-import type { Hunt } from '@/lib/validations/hunt';
+import { adminDb } from "@/lib/firebase/admin";
+import { revalidatePath } from "next/cache";
+import { FieldValue } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 
-// This is a simplified type for the incoming form data,
-// as the full Hunt type includes server-generated fields.
-// The species is an array, matching the form's output.
-interface HuntCreationData {
-  title: string;
-  description: string;
-  basePrice: number;
-  baseCurrency: 'USD' | 'EUR' | 'ZAR';
-  province: string;
-  species: string[];
-  imageUrl: string;
-  outfitterName: string;
+// Helper to clean up Firestore timestamps for the frontend
+function sanitizeHunt(doc: any) {
+  const data = doc.data();
+  return {
+    id: doc.id,
+    ...data,
+    createdAt: data.createdAt?.toDate?.()?.toISOString() || data.createdAt || new Date().toISOString(),
+  };
 }
 
-export async function createHunt(data: HuntCreationData, outfitterId: string) {
+export async function getAllHunts() {
   try {
-    // Data is assumed to be validated by the form before calling this action.
-    const payload: Omit<Hunt, 'id' | 'createdAt' | 'approvedAt' | 'lastViewedAt'> = {
-      ...data,
-      outfitterId,
-      isVerified: false, // Outfitters themselves need verification first
-      status: 'pending', // All new hunts require admin approval
-    };
+    const snap = await adminDb.collection("hunts").orderBy("createdAt", "desc").get();
+    return { success: true, data: snap.docs.map(sanitizeHunt) };
+  } catch (error: any) {
+    console.error("Error fetching hunts:", error);
+    return { success: false, error: error.message };
+  }
+}
 
-    const docRef = await adminDb.collection('hunts').add({
-      ...payload,
-      createdAt: new Date().toISOString(),
+export async function updateHuntStatus(huntId: string, status: "APPROVED" | "REJECTED", note?: string) {
+  try {
+    await adminDb.collection("hunts").doc(huntId).update({
+      status: status,
+      adminNote: note || "",
+      reviewedAt: new Date().toISOString(),
     });
+
+    revalidatePath("/dashboard/hunts");
+    revalidatePath("/"); // NEW: Forces the homepage to refresh its snapshot!
     
-    revalidatePath('/outfitter/dashboard/hunts'); // Revalidate the hunts table
-    revalidatePath('/'); // Revalidate homepage feed
-    return { success: true, id: docRef.id };
-  } catch (error) {
-    console.error('Error creating hunt:', error);
-    return { success: false, error: 'Failed to create hunting package.' };
-  }
-}
-
-export async function getOutfitterHunts(outfitterId: string) {
-  try {
-    const snapshot = await adminDb
-      .collection('hunts')
-      .where('outfitterId', '==', outfitterId)
-      .orderBy('createdAt', 'desc')
-      .get();
-      
-    const hunts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    return { success: true, hunts };
-  } catch (error) {
-    console.error('Error fetching hunts:', error);
-    return { success: false, error: 'Failed to fetch hunts', hunts: [] };
-  }
-}
-
-export async function deleteHunt(huntId: string) {
-  try {
-    await adminDb.collection('hunts').doc(huntId).delete();
-    revalidatePath('/outfitter/dashboard/hunts');
-    revalidatePath('/');
     return { success: true };
-  } catch (error) {
-    console.error('Error deleting hunt:', error);
-    return { success: false, error: 'Failed to delete hunt' };
-  }
-}
-
-export async function getPublishedHunts() {
-  try {
-    const snapshot = await adminDb
-      .collection('hunts')
-      // Only show hunts that are both active and from a verified outfitter
-      .where('status', '==', 'active')
-      .where('isVerified', '==', true)
-      .orderBy('createdAt', 'desc')
-      .limit(20)
-      .get();
-      
-    const hunts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    return { success: true, hunts };
-  } catch (error) {
-    console.error('Error fetching published hunts:', error);
-    return { success: false, error: 'Failed to load the marketplace', hunts: [] };
+  } catch (error: any) {
+    return { success: false, error: error.message };
   }
 }
 
 export async function getHuntById(id: string) {
   try {
-    const docSnap = await adminDb.collection('hunts').doc(id).get();
-    if (!docSnap.exists) return { success: false, error: 'Hunt not found' };
-    return { success: true, hunt: { id: docSnap.id, ...docSnap.data() } as any };
-  } catch (error) {
-    console.error('Error fetching hunt by ID:', error);
-    return { success: false, error: 'Failed to fetch hunt details' };
+    const doc = await adminDb.collection("hunts").doc(id).get();
+    if (!doc.exists) {
+      return { success: false, error: "Hunt not found." };
+    }
+    
+    const data = doc.data()!;
+    return { 
+      success: true, 
+      data: {
+        id: doc.id,
+        ...data,
+        createdAt: data.createdAt?.toDate?.()?.toISOString() || data.createdAt || new Date().toISOString(),
+      }
+    };
+  } catch (error: any) {
+    console.error("Error fetching hunt:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function createHuntListing(huntData: any, outfitterId: string) {
+  try {
+    const outfitterDoc = await adminDb.collection("outfitters").doc(outfitterId).get();
+    
+    // Security check: Only ACTIVE outfitters can post
+    if (!outfitterDoc.exists || outfitterDoc.data()?.status !== "ACTIVE") {
+      return { success: false, error: "Your account must be ACTIVE to publish listings." };
+    }
+
+    const newHunt = {
+      ...huntData,
+      outfitterId,
+      status: "PENDING", // Forces admin review before going live
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    const docRef = await adminDb.collection("hunts").add(newHunt);
+
+    // Increment outfitter's total listings stat
+    await adminDb.collection("outfitters").doc(outfitterId).update({
+      totalListings: FieldValue.increment(1)
+    });
+
+    revalidatePath("/outfitter/dashboard");
+    revalidatePath("/outfitter/dashboard/hunts");
+    revalidatePath("/dashboard"); 
+
+    return { success: true, huntId: docRef.id };
+  } catch (error: any) {
+    console.error("Error creating hunt:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+// --- NEW FUNCTION: PERMANENTLY DELETE A HUNT & ITS IMAGES ---
+export async function deleteHunt(huntId: string) {
+  try {
+    const huntDoc = await adminDb.collection("hunts").doc(huntId).get();
+    if (!huntDoc.exists) {
+      return { success: false, error: "Hunt not found." };
+    }
+
+    const huntData = huntDoc.data();
+    const outfitterId = huntData?.outfitterId;
+
+    // 1. Gather any attached images (handles both single strings and arrays)
+    const imagesToScrub: string[] = [];
+    if (huntData?.imageUrl) imagesToScrub.push(huntData.imageUrl);
+    if (huntData?.coverImage) imagesToScrub.push(huntData.coverImage);
+    if (Array.isArray(huntData?.images)) imagesToScrub.push(...huntData.images);
+
+    // 2. Delete the actual image files from the Firebase Storage Bucket
+    for (const url of imagesToScrub) {
+      if (typeof url === 'string' && url.includes("firebasestorage.googleapis.com")) {
+        try {
+          const urlObj = new URL(url);
+          const parts = urlObj.pathname.split('/o/');
+          if (parts.length === 2) {
+            const bucketName = parts[0].split('/b/')[1];
+            const filePath = decodeURIComponent(parts[1]);
+            // Tell the admin storage to delete the specific file
+            await getStorage().bucket(bucketName).file(filePath).delete();
+          }
+        } catch (imgError) {
+          console.error("Failed to delete image from storage:", imgError);
+          // Fails silently for images so the database document still gets deleted
+        }
+      }
+    }
+
+    // 3. Delete the hunt document from Firestore
+    await adminDb.collection("hunts").doc(huntId).delete();
+
+    // 4. Decrement the outfitter's stat so their count stays accurate
+    if (outfitterId) {
+      await adminDb.collection("outfitters").doc(outfitterId).update({
+        totalListings: FieldValue.increment(-1)
+      });
+    }
+
+    revalidatePath("/dashboard/hunts");
+    revalidatePath("/outfitter/dashboard");
+    revalidatePath("/"); // NEW: Also refresh homepage when a hunt is deleted!
+    
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error deleting hunt:", error);
+    return { success: false, error: error.message };
   }
 }

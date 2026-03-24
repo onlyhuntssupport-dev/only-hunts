@@ -41,19 +41,19 @@ export function HuntCard({ hunt, currency }: HuntProps) {
       </div>
 
       <div className="p-4 flex flex-col flex-grow">
-        <h3 className="text-lg font-bold text-olive">{hunt.title}</h3>
+        <h3 className="text-lg font-bold text-olive dark:text-off-white">{hunt.title}</h3>
         <p className="text-sm text-slate-500">{hunt.outfitterName}</p>
         
         <div className="mt-3 flex flex-wrap gap-2">
           {hunt.species.map((s) => (
-            <span key={s} className="rounded bg-kalahari/20 px-2 py-0.5 text-xs font-medium text-olive">
+            <span key={s} className="rounded bg-kalahari/20 px-2 py-0.5 text-xs font-medium text-olive dark:text-off-white">
               {s}
             </span>
           ))}
         </div>
 
         <div className="mt-auto pt-4 flex items-center justify-between border-t border-gray-100 mt-4">
-          <span className="text-xl font-bold text-olive">{price}</span>
+          <span className="text-xl font-bold text-olive dark:text-off-white">{price}</span>
            <Link href={`/hunts/${hunt.id}`} className="rounded-md bg-olive px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-opacity-90">
             View Details
           </Link>

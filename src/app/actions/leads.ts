@@ -2,45 +2,41 @@
 
 import { z } from 'zod';
 import { adminDb } from '@/lib/firebase/admin';
+import { revalidatePath } from 'next/cache';
 
-export const LeadSchema = z.object({
+const LeadSchema = z.object({
   huntId: z.string().min(1),
   outfitterId: z.string().min(1),
   name: z.string().min(2, 'Name is required'),
-  email: z.string().email('Invalid email address'),
-  phone: z.string().optional(),
+  email: z.string().email('Invalid email address').optional(), 
   message: z.string().min(10, 'Please provide more details in your message'),
-  honeypot: z.string().max(0, { message: 'Bots are not welcome.' }).optional(), // Must be empty (bot trap)
+  honeypot: z.string().max(0, { message: 'Bots are not welcome.' }).optional(),
 });
 
-export type LeadFormData = z.infer<typeof LeadSchema>;
+type LeadFormData = z.infer<typeof LeadSchema>;
 
 export async function submitLead(data: LeadFormData) {
   try {
     const parsedData = LeadSchema.parse(data);
 
-    // 1. Spam Prevention: If honeypot is filled, silently reject but return success
     if (parsedData.honeypot) {
       console.warn('Bot detected by honeypot on lead submission.');
       return { success: true }; 
     }
 
-    // 2. Prepare the payload
     const leadPayload = {
       huntId: parsedData.huntId,
       outfitterId: parsedData.outfitterId,
       hunterDetails: {
         name: parsedData.name,
-        email: parsedData.email,
-        phone: parsedData.phone || null,
+        email: parsedData.email || "Platform Secure Request",
       },
       message: parsedData.message,
-      status: 'new', // new, contacted, booked, lost
+      status: 'NEW', 
       createdAt: new Date().toISOString(),
     };
 
-    // 3. Save to Firestore
-    await adminDb.collection('leads').add(leadPayload);
+    await adminDb.collection('inquiries').add(leadPayload);
 
     return { success: true };
   } catch (error) {
@@ -49,5 +45,62 @@ export async function submitLead(data: LeadFormData) {
         return { success: false, error: 'Validation failed.', issues: error.errors };
     }
     return { success: false, error: 'Failed to submit inquiry. Please try again.' };
+  }
+}
+
+// --- FETCH LEADS FOR AN OUTFITTER ---
+export async function getOutfitterLeads(outfitterId: string) {
+  try {
+    // FIX: Removed the .orderBy() to bypass the Firebase Composite Index error
+    const snapshot = await adminDb.collection('inquiries')
+      .where('outfitterId', '==', outfitterId)
+      .get();
+
+    if (snapshot.empty) return { success: true, data: [] };
+
+    const leads = await Promise.all(snapshot.docs.map(async (doc) => {
+      const leadData = doc.data();
+      
+      let huntTitle = leadData.huntTitle || "Unknown Package";
+      
+      if (!leadData.huntTitle) {
+          try {
+            const huntDoc = await adminDb.collection('hunts').doc(leadData.huntId).get();
+            if (huntDoc.exists) huntTitle = huntDoc.data()?.title || "Unknown Package";
+          } catch (e) {
+            // Fallback
+          }
+      }
+
+      return {
+        id: doc.id,
+        ...leadData,
+        huntTitle
+      };
+    }));
+
+    // Sort the leads in memory (newest first) instead of making Firebase do it
+    leads.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    return { success: true, data: leads };
+  } catch (error: any) {
+    console.error("Error fetching leads:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+// --- UPDATE LEAD STATUS ---
+export async function updateLeadStatus(leadId: string, newStatus: string) {
+  try {
+    await adminDb.collection('inquiries').doc(leadId).update({
+      status: newStatus,
+      updatedAt: new Date().toISOString()
+    });
+    
+    revalidatePath("/outfitter/dashboard/leads");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error updating lead status:", error);
+    return { success: false, error: error.message };
   }
 }

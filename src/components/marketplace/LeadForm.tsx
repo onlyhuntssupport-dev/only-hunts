@@ -1,14 +1,13 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { LeadSchema, type LeadFormData } from '@/app/actions/leads';
-import { submitLead } from '@/app/actions/leads';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Loader2 } from 'lucide-react';
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { auth, db } from "@/lib/firebase/client";
+import { collection, addDoc, query, where, getDocs } from "firebase/firestore";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Send, Loader2, CalendarDays, Users, MessageSquare, CheckCircle2, Lock } from "lucide-react";
 
 interface LeadFormProps {
   huntId: string;
@@ -17,111 +16,207 @@ interface LeadFormProps {
 }
 
 export default function LeadForm({ huntId, outfitterId, huntTitle }: LeadFormProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [serverError, setServerError] = useState('');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState("");
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors, isSubmitting },
-  } = useForm<LeadFormData>({
-    resolver: zodResolver(LeadSchema),
-    defaultValues: { huntId, outfitterId, honeypot: '' },
+  const [formData, setFormData] = useState({
+    name: "",
+    preferredDates: "",
+    partySize: "1",
+    message: "I am interested in booking this package. Please let me know your availability."
   });
 
-  const onSubmit = async (data: LeadFormData) => {
-    setServerError('');
-    const result = await submitLead(data);
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      setIsAuthenticated(!!user);
+      
+      if (user) {
+        if (user.displayName) {
+          setFormData(prev => ({ ...prev, name: user.displayName as string }));
+        }
+
+        try {
+          const offersRef = collection(db, "offers");
+          const q = query(
+            offersRef,
+            where("hunterId", "==", user.uid),
+            where("huntId", "==", huntId)
+          );
+          
+          const snap = await getDocs(q);
+          
+          if (!snap.empty) {
+            const fetchedOffers = snap.docs.map(doc => doc.data() as any);
+            fetchedOffers.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            const latestOffer = fetchedOffers[0];
+            
+            setFormData(prev => ({
+              ...prev,
+              message: `Hi! I am reaching out to claim the exclusive offer you sent me:\n\n"${latestOffer.message}"\n\nI am very interested in booking this package. Please let me know your availability.`
+            }));
+          }
+        } catch (err) {
+          console.error("Error checking for VIP offers:", err);
+        }
+      }
+      
+      setLoading(false);
+    });
     
-    if (result.success) {
-      setIsSuccess(true);
-      reset({ huntId, outfitterId, honeypot: '' });
-    } else {
-      setServerError(result.error || 'Something went wrong.');
+    return () => unsubscribe();
+  }, [huntId]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    if (!auth.currentUser) {
+      setError("You must be logged in to send an inquiry.");
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      await addDoc(collection(db, "inquiries"), {
+        huntId,
+        huntTitle,
+        outfitterId,
+        hunterId: auth.currentUser.uid,
+        hunterEmail: auth.currentUser.email,
+        hunterName: formData.name,
+        preferredDates: formData.preferredDates,
+        partySize: Number(formData.partySize),
+        message: formData.message,
+        status: "NEW", 
+        createdAt: new Date().toISOString(),
+      });
+
+      setSuccess(true);
+    } catch (err: any) {
+      console.error("Error submitting lead:", err);
+      setError("Failed to send inquiry. Please try again.");
+      setSubmitting(false);
     }
   };
 
-  if (!isOpen) {
+  if (loading) {
     return (
-      <Button onClick={() => setIsOpen(true)} size="lg" className="w-full mt-4">
-        Inquire About This Hunt
-      </Button>
+      <div className="flex justify-center py-4">
+        <Loader2 className="animate-spin h-6 w-6 text-kalahari" />
+      </div>
+    );
+  }
+
+  if (success) {
+    return (
+      <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4 text-center shadow-sm animate-in fade-in zoom-in duration-300">
+        <div className="mx-auto w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mb-3">
+          <CheckCircle2 className="h-5 w-5 text-green-600" />
+        </div>
+        <h3 className="text-lg font-black text-green-800 font-headline mb-1">Inquiry Sent!</h3>
+        <p className="text-green-700 font-medium text-xs">
+          The outfitter will contact you via the secure platform shortly.
+        </p>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="bg-kalahari/5 border-2 border-kalahari/20 rounded-lg p-5 text-center">
+        <div className="mx-auto w-10 h-10 bg-kalahari/10 rounded-full flex items-center justify-center mb-3">
+          <Lock className="h-5 w-5 text-kalahari" />
+        </div>
+        <h3 className="text-base font-black text-olive dark:text-off-white font-headline mb-1">Members Only</h3>
+        <p className="text-olive dark:text-off-white/70 font-medium text-xs mb-4">
+          Create a free account to securely message outfitters and book.
+        </p>
+        <div className="flex flex-col gap-2.5">
+          <Link href="/login" className="w-full">
+            <Button className="w-full h-10 bg-olive hover:bg-olive/90 text-kalahari font-black shadow-md">
+              Log In
+            </Button>
+          </Link>
+          <Link href="/register" className="w-full">
+            <Button variant="outline" className="w-full h-10 border-2 border-kalahari/30 text-olive dark:text-off-white hover:bg-kalahari/10 font-black">
+              Create Free Account
+            </Button>
+          </Link>
+        </div>
+      </div>
     );
   }
 
   return (
-    <div className="bg-card border rounded-lg p-6 mt-4 shadow-lg">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="font-headline text-xl font-bold">Inquire: {huntTitle}</h3>
-        <button onClick={() => setIsOpen(false)} className="text-muted-foreground hover:text-foreground text-2xl font-light">&times;</button>
+    <form onSubmit={handleSubmit} className="space-y-3">
+      {error && (
+        <div className="p-2.5 bg-red-50 border border-red-200 text-red-700 text-xs font-bold rounded-md">
+          {error}
+        </div>
+      )}
+
+      <div className="space-y-3">
+        <div>
+          <label className="text-[11px] font-bold text-olive dark:text-off-white mb-1 flex items-center gap-1">
+            Your Full Name
+          </label>
+          <Input 
+            name="name" required value={formData.name} onChange={handleChange} 
+            placeholder="John Doe" 
+            className="h-9 border-kalahari/30 focus-visible:ring-kalahari font-medium text-sm" 
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-[11px] font-bold text-olive dark:text-off-white mb-1 flex items-center gap-1">
+              <CalendarDays className="h-3 w-3 text-kalahari" /> Preferred Dates
+            </label>
+            <Input 
+              name="preferredDates" required value={formData.preferredDates} onChange={handleChange} 
+              placeholder="e.g. Oct 2026" 
+              className="h-9 border-kalahari/30 focus-visible:ring-kalahari font-medium text-sm" 
+            />
+          </div>
+          <div>
+            <label className="text-[11px] font-bold text-olive dark:text-off-white mb-1 flex items-center gap-1">
+              <Users className="h-3 w-3 text-kalahari" /> Hunters
+            </label>
+            <Input 
+              name="partySize" required type="number" min="1" value={formData.partySize} onChange={handleChange} 
+              className="h-9 border-kalahari/30 focus-visible:ring-kalahari font-medium text-sm" 
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="text-[11px] font-bold text-olive dark:text-off-white mb-1 flex items-center gap-1">
+            <MessageSquare className="h-3 w-3 text-kalahari" /> Message
+          </label>
+          <Textarea 
+            name="message" required value={formData.message} onChange={handleChange} 
+            rows={3} 
+            className="border-kalahari/30 focus-visible:ring-kalahari font-medium resize-none text-sm" 
+          />
+        </div>
       </div>
 
-      {isSuccess ? (
-        <div className="p-4 bg-green-50 text-green-800 border border-green-200 rounded-md text-center">
-          <p className="font-bold">Inquiry Sent!</p>
-          <p className="text-sm mt-1">The outfitter will contact you shortly.</p>
-          <Button variant="outline" className="mt-4 w-full" onClick={() => { setIsOpen(false); setIsSuccess(false); }}>Close</Button>
-        </div>
-      ) : (
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          {/* Honeypot field - invisible to users */}
-          <div className="hidden" aria-hidden="true">
-            <input type="text" {...register('honeypot')} tabIndex={-1} autoComplete="off" />
-          </div>
-
-          <div>
-            <label htmlFor="name" className="block text-sm font-medium mb-1">Name</label>
-            <Input 
-              id="name"
-              {...register('name')} 
-              placeholder="John Doe"
-            />
-            {errors.name && <p className="text-destructive text-xs mt-1">{errors.name.message}</p>}
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium mb-1">Email</label>
-              <Input
-                id="email"
-                {...register('email')} 
-                type="email" 
-                placeholder="john@example.com"
-              />
-              {errors.email && <p className="text-destructive text-xs mt-1">{errors.email.message}</p>}
-            </div>
-            <div>
-              <label htmlFor="phone" className="block text-sm font-medium mb-1">Phone (Optional)</label>
-              <Input
-                id="phone"
-                {...register('phone')} 
-                type="tel" 
-                placeholder="+27 82 000 0000"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label htmlFor="message" className="block text-sm font-medium mb-1">Message</label>
-            <Textarea 
-              id="message"
-              {...register('message')} 
-              rows={4} 
-              placeholder="I'm interested in booking this hunt for 2 people next season..."
-            />
-            {errors.message && <p className="text-destructive text-xs mt-1">{errors.message.message}</p>}
-          </div>
-
-          {serverError && <p className="text-destructive text-sm font-medium">{serverError}</p>}
-
-          <Button type="submit" disabled={isSubmitting} className="w-full">
-            {isSubmitting && <Loader2 className="animate-spin mr-2" />}
-            {isSubmitting ? 'Sending...' : 'Send Inquiry'}
-          </Button>
-        </form>
-      )}
-    </div>
+      <Button 
+        type="submit" 
+        disabled={submitting} 
+        className="w-full h-11 mt-1 bg-kalahari hover:bg-kalahari/90 text-white font-black text-base shadow-md transition-all flex items-center justify-center gap-2"
+      >
+        {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+        {submitting ? "Sending..." : "Send Inquiry"}
+      </Button>
+    </form>
   );
 }

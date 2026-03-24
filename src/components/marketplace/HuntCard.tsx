@@ -1,67 +1,73 @@
-
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import Image from 'next/image';
+import { MapPin, ShieldCheck, User } from 'lucide-react';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
 
 interface HuntCardProps {
-  hunt: {
-    id: string;
-    title: string;
-    description: string;
-    basePrice: number;
-    province: string;
-    species: string[];
-    imageUrl?: string;
-  };
+  hunt: any;
 }
 
-export function HuntCard({ hunt }: HuntCardProps) {
-  // Take the first 3 species for display
-  const speciesList = hunt.species.slice(0, 3);
+export default function HuntCard({ hunt }: HuntCardProps) {
+  const displayPrice = hunt.price || hunt.basePrice;
+  const displayLocation = hunt.location || hunt.province || "South Africa";
 
   return (
-    <div className="group flex flex-col bg-card border rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 h-full">
-      {/* Image Container */}
-      <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
-        <img 
-          src={hunt.imageUrl || 'https://images.unsplash.com/photo-1588612143003-88da87c71d64?q=80&w=800&auto=format&fit=crop'} 
-          alt={hunt.title}
-          className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-300"
-        />
-        <div className="absolute top-3 right-3 bg-background/90 backdrop-blur-sm px-3 py-1 rounded-full text-sm font-bold text-foreground">
-          ${hunt.basePrice.toLocaleString()}
-        </div>
-      </div>
-
-      {/* Content Container */}
-      <div className="flex flex-col flex-1 p-5">
-        <div className="text-xs font-medium text-primary mb-2 uppercase tracking-wider">
-          {hunt.province}
-        </div>
-        
-        <h3 className="font-headline font-bold text-lg mb-2 line-clamp-2 flex-grow">
-          {hunt.title}
-        </h3>
-        
-        <div className="flex flex-wrap gap-2 mb-4">
-          {speciesList.map((species, i) => (
-            <Badge key={i} variant="secondary" className="font-normal">
-              {species}
-            </Badge>
-          ))}
-          {hunt.species.length > 3 && (
-            <Badge variant="secondary" className="font-normal">
-              +{hunt.species.length - 3} more
-            </Badge>
+    <Link href={`/hunts/${hunt.id}`} className="group">
+      <Card className="h-full overflow-hidden border-kalahari/20 hover:border-kalahari transition-all duration-300 shadow-sm hover:shadow-md bg-white">
+        {/* Image Section */}
+        <div className="relative aspect-[4/3] overflow-hidden">
+          <Image
+            src={hunt.imageUrl || "/api/placeholder/400/300"}
+            alt={hunt.title}
+            fill
+            className="object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+          {hunt.isVerified && (
+            <div className="absolute top-2 left-2 bg-olive text-white text-[10px] font-bold px-2 py-1 rounded flex items-center gap-1 shadow-lg">
+              <ShieldCheck size={12} /> VERIFIED
+            </div>
           )}
         </div>
 
-        <Button asChild variant="outline" className="w-full group-hover:bg-primary group-hover:text-primary-foreground transition-colors mt-auto">
-          <Link href={`/hunts/${hunt.id}`} className="w-full">
-            View Details
-          </Link>
-        </Button>
-      </div>
-    </div>
+        <CardContent className="p-4">
+          <div className="flex items-center gap-1 text-olive dark:text-off-white/60 text-xs font-bold mb-2 uppercase tracking-tighter">
+            <MapPin size={12} className="text-kalahari" />
+            {displayLocation}
+          </div>
+          
+          <h3 className="text-xl font-bold font-headline text-olive dark:text-off-white group-hover:text-kalahari transition-colors line-clamp-1 mb-1">
+            {hunt.title}
+          </h3>
+
+          {/* --- NEW: OUTFITTER NAME SECTION --- */}
+          <div className="flex items-center gap-2 mb-4">
+            <div className="p-1 bg-kalahari/10 rounded-full">
+              <User size={12} className="text-olive dark:text-off-white/70" />
+            </div>
+            <span className="text-sm font-medium text-olive dark:text-off-white/70">
+              {hunt.outfitterName || "Professional Outfitter"}
+            </span>
+          </div>
+
+          <div className="flex items-baseline gap-1">
+            <span className="text-sm font-bold text-olive dark:text-off-white/50">$</span>
+            <span className="text-2xl font-black text-olive dark:text-off-white">
+              {displayPrice ? displayPrice.toLocaleString() : "Contact"}
+            </span>
+            {hunt.duration && (
+              <span className="text-xs font-bold text-olive dark:text-off-white/40 ml-1">
+                / {hunt.duration} DAYS
+              </span>
+            )}
+          </div>
+        </CardContent>
+
+        <CardFooter className="px-4 pb-4 pt-0">
+          <div className="w-full py-2 border-t border-kalahari/10 text-center text-xs font-black text-kalahari uppercase tracking-widest group-hover:bg-kalahari group-hover:text-white transition-colors duration-300 rounded">
+            View Expedition
+          </div>
+        </CardFooter>
+      </Card>
+    </Link>
   );
 }

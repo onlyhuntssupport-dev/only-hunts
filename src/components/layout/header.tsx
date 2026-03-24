@@ -1,7 +1,7 @@
-
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Menu, LogIn, Heart, LayoutDashboard, LogOut, Settings, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -35,6 +35,10 @@ const navLinks: NavLink[] = [
 export function Header() {
   const { user, loading } = useUser();
   const { toast } = useToast();
+  const pathname = usePathname();
+
+  // --- THE DETECTIVE: Are we on a dashboard? ---
+  const isDashboard = pathname?.includes('/dashboard');
 
   const handleSignOut = async () => {
     try {
@@ -53,23 +57,30 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 max-w-7xl items-center">
+        
+        {/* DESKTOP VIEW */}
         <div className="mr-4 hidden md:flex">
           <Link href="/" className="mr-6 flex items-center space-x-2">
             <Logo />
           </Link>
-          <nav className="flex items-center gap-6 text-sm">
-            {navLinks.map((link) => (
-              <Link
-                key={link.id}
-                href={link.href}
-                className="transition-colors hover:text-foreground/80 text-foreground/60"
-              >
-                {link.label}
-              </Link>
-            ))}
-          </nav>
+          
+          {/* Only show the marketplace links if we are NOT on a dashboard */}
+          {!isDashboard && (
+            <nav className="flex items-center gap-6 text-sm">
+              {navLinks.map((link) => (
+                <Link
+                  key={link.id}
+                  href={link.href}
+                  className="transition-colors hover:text-foreground/80 text-foreground/60"
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </nav>
+          )}
         </div>
 
+        {/* MOBILE VIEW */}
         <div className="md:hidden">
           <Sheet>
             <SheetTrigger asChild>
@@ -83,22 +94,27 @@ export function Header() {
                 <Link href="/" className="mb-4 flex items-center">
                   <Logo />
                 </Link>
-                <div className="flex flex-col gap-4 py-4">
-                  {navLinks.map((link) => (
-                    <Link
-                      key={link.id}
-                      href={link.href}
-                      className="text-foreground"
-                    >
-                      {link.label}
-                    </Link>
-                  ))}
-                </div>
+                
+                {/* Only show the marketplace links in mobile menu if we are NOT on a dashboard */}
+                {!isDashboard && (
+                  <div className="flex flex-col gap-4 py-4">
+                    {navLinks.map((link) => (
+                      <Link
+                        key={link.id}
+                        href={link.href}
+                        className="text-foreground"
+                      >
+                        {link.label}
+                      </Link>
+                    ))}
+                  </div>
+                )}
               </div>
             </SheetContent>
           </Sheet>
         </div>
         
+        {/* RIGHT SIDE: User Profile / Login */}
         <div className="flex flex-1 items-center justify-end space-x-2">
           {loading ? (
             <Skeleton className="h-8 w-8 rounded-full" />
@@ -140,11 +156,11 @@ export function Header() {
                 )}
                 
                 <DropdownMenuItem>
-                  <Settings /> Profile
+                  <Settings className="mr-2 h-4 w-4" /> Profile
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleSignOut} className="flex items-center gap-2">
-                  <LogOut /> Log out
+                <DropdownMenuItem onClick={handleSignOut} className="flex items-center gap-2 text-red-600 focus:text-red-600">
+                  <LogOut className="h-4 w-4" /> Log out
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

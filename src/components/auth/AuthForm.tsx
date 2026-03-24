@@ -40,14 +40,17 @@ export default function AuthForm() {
 
       if (!syncResult.success) throw new Error(syncResult.error || 'Profile sync failed');
 
+      // --- SMART ROUTING: Google Auth ---
       if (syncResult.role === 'OUTFITTER') {
         router.push('/outfitter/dashboard');
       } else if (syncResult.role === 'ADMIN') {
         router.push('/admin');
+      } else if (syncResult.role === 'HUNTER') {
+        router.push('/hunter/dashboard'); // Fix applied here!
+      } else {
+        router.push('/');
       }
-      else {
-        router.push('/hunts');
-      }
+      
       router.refresh(); 
 
     } catch (err: any) {
@@ -76,16 +79,19 @@ export default function AuthForm() {
       });
       
       const tokenResult = await user.getIdTokenResult();
-      const role = tokenResult.claims.role;
+      const userRole = tokenResult.claims.role;
 
       toast({ title: "Login Successful", description: "Welcome back!" });
 
-      if (role === 'ADMIN') {
+      // --- SMART ROUTING: Email Login ---
+      if (userRole === 'ADMIN') {
         router.push('/admin');
-      } else if (role === 'OUTFITTER') {
+      } else if (userRole === 'OUTFITTER') {
         router.push('/outfitter/dashboard');
+      } else if (userRole === 'HUNTER') {
+        router.push('/hunter/dashboard'); // Fix applied here!
       } else {
-        router.push('/hunts');
+        router.push('/');
       }
       
       router.refresh();

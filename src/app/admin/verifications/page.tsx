@@ -1,4 +1,4 @@
-import { verifyOutfitter } from '@/app/actions/admin';
+import { verifyOutfitter } from '@/app/actions/admins';
 import { adminDb } from '@/lib/firebase/admin';
 import { CheckCircle, FileText, ExternalLink } from 'lucide-react';
 import {

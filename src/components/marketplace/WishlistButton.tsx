@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useOptimistic, useTransition } from 'react';
@@ -42,17 +41,19 @@ export default function WishlistButton({ huntId, hunterId, isInitiallySaved, cla
 
   return (
     <Button
-      variant="ghost"
-      size="icon"
+      variant="outline"
       onClick={handleClick}
       disabled={isPending}
-      className={cn('shrink-0', className)}
+      className={cn('shrink-0 border-kalahari/30 hover:bg-kalahari/10 transition-colors', className)}
       aria-label={optimisticIsSaved ? 'Remove from wishlist' : 'Add to wishlist'}
     >
       <Heart className={cn(
-          'transition-all', 
-          optimisticIsSaved ? 'fill-red-500 text-red-500' : 'text-muted-foreground'
+          'h-5 w-5 mr-2 transition-all', 
+          optimisticIsSaved ? 'fill-red-500 text-red-500' : 'text-olive dark:text-off-white/50'
       )} />
+      <span className="font-bold text-olive dark:text-off-white">
+        {optimisticIsSaved ? 'Saved to Wishlist' : 'Save to Wishlist'}
+      </span>
     </Button>
   );
 }

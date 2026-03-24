@@ -1,50 +1,84 @@
+"use server";
 
-'use server';
+import { adminDb, adminAuth } from "@/lib/firebase/admin";
+import { revalidatePath } from "next/cache";
 
-import { adminDb } from '@/lib/firebase/admin';
-import type { UserRole } from '@/types/auth';
+function sanitizeData(doc: any) {
+  const data = doc.data();
+  let createdAt = data.createdAt || null;
+  
+  if (createdAt && typeof createdAt.toDate === 'function') {
+    createdAt = createdAt.toDate().toISOString();
+  } else if (createdAt) {
+    createdAt = new Date(createdAt).toISOString();
+  }
 
-interface SyncUserParams {
-  uid: string;
-  email: string | null;
-  displayName: string | null;
-  photoURL: string | null;
-  role: UserRole;
+  return { id: doc.id, ...data, createdAt };
 }
 
-export async function syncUserProfile({ uid, email, displayName, photoURL, role }: SyncUserParams) {
+export async function getOutfitters() {
   try {
-    const userRef = adminDb.collection('users').doc(uid);
-    const docSnap = await userRef.get();
+    const snap = await adminDb.collection("users").where("role", "==", "OUTFITTER").get();
+    return { success: true, data: snap.docs.map(sanitizeData) };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
 
-    if (!docSnap.exists) {
-      // First-time login: Create the complete profile
-      const newProfile = {
-        displayName,
-        email,
-        photoURL,
-        role, // Only set role on creation
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        isVerified: role === 'HUNTER', // Hunters are auto-verified, Outfitters need admin approval
-      };
-      
-      await userRef.set(newProfile);
-      return { success: true, isNewUser: true, role };
-    } else {
-      // Returning user: Only update what's necessary
-      const updatePayload = {
-        updatedAt: new Date().toISOString(),
-        photoURL, // Update in case their Google profile picture changed
-      };
-      await userRef.set(updatePayload, { merge: true });
+export async function getAdmins() {
+  try {
+    const snap = await adminDb.collection("users").where("role", "in", ["SUPER_ADMIN", "ADMIN", "MODERATOR"]).get();
+    return { success: true, data: snap.docs.map(sanitizeData) };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
 
-      const existingData = docSnap.data();
-      // Return their actual database role, ignoring any role sent from the client
-      return { success: true, isNewUser: false, role: existingData?.role || 'HUNTER' };
-    }
-  } catch (error) {
-    console.error('Error syncing user profile:', error);
-    return { success: false, error: 'Failed to sync user profile' };
+// PERMANENT DELETION LOGIC
+export async function deleteAdminAccount(uid: string) {
+  try {
+    // 1. Delete from Firebase Authentication (The login)
+    await adminAuth.deleteUser(uid);
+
+    // 2. Delete from Firestore (The data)
+    await adminDb.collection("users").doc(uid).delete();
+
+    revalidatePath("/dashboard/admins");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Deletion error:", error);
+    return { success: false, error: error.message || "Failed to permanently delete account." };
+  }
+}
+
+// ... (keep createOutfitter and updateOutfitterStatus below this)
+export async function updateOutfitterStatus(id: string, status: "ACTIVE" | "REJECTED", reason?: string) {
+  try {
+    const updateData: any = { status, statusUpdatedAt: new Date().toISOString() };
+    if (status === "REJECTED" && reason) updateData.rejectionReason = reason;
+    await adminDb.collection("users").doc(id).update(updateData);
+    revalidatePath("/dashboard/outfitters");
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function createOutfitter(formData: FormData) {
+  try {
+    const name = formData.get("name") as string;
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
+    const permitUrl = formData.get("permitUrl") as string;
+    if (!name || !email || !password || !permitUrl) return { success: false, error: "Missing fields" };
+    const userRecord = await adminAuth.createUser({ email, password, displayName: name });
+    await adminDb.collection("users").doc(userRecord.uid).set({
+      name, email, role: "OUTFITTER", status: "ACTIVE", permitUrl,
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+    });
+    revalidatePath("/dashboard/outfitters");
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
   }
 }

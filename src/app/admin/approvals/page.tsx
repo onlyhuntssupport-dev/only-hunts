@@ -1,5 +1,5 @@
 
-import { approveHuntListing } from '@/app/actions/admin';
+import { approveHuntListing } from '@/app/actions/admins';
 import { adminDb } from '@/lib/firebase/admin';
 import { CheckCircle, ExternalLink } from 'lucide-react';
 import {

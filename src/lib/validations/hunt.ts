@@ -1,25 +1,30 @@
-
 import { z } from 'zod';
 
 export const HuntSchema = z.object({
-  id: z.string(),
-  title: z.string().min(5),
-  description: z.string().min(20, 'Please provide a detailed description.'),
-  outfitterId: z.string(),
-  outfitterName: z.string(),
-  basePrice: z.number().positive(),
-  baseCurrency: z.enum(['USD', 'EUR', 'ZAR']),
-  species: z.array(z.string()),
-  province: z.enum(['Limpopo', 'Eastern Cape', 'North West', 'Free State', 'Mpumalanga', 'Northern Cape', 'KwaZulu-Natal']),
-  imageUrl: z.string().url(),
-  imageHint: z.string().optional(),
+  id: z.string().optional(),
+  outfitterId: z.string().optional(),
+  outfitterName: z.string().optional(),
+  title: z.string().min(5, "Title must be at least 5 characters"),
+  description: z.string().min(20, "Please provide a detailed description"),
+  location: z.string().min(2, "Location is required"),
+  province: z.string().optional(),
+  price: z.number().min(1, "Price must be greater than 0"),
+  duration: z.number().min(1, "Duration must be at least 1 day"),
+  primarySpecies: z.string().min(2, "Primary species is required"),
+  species: z.array(z.string()).optional(),
+  
+  // --- NEW FIELDS ADDED HERE ---
+  coverImage: z.string().optional(), 
+  images: z.array(z.string()).optional(),
+  includedItems: z.string().optional(), 
+  excludedItems: z.string().optional(), 
+  additionalSpecies: z.string().optional(), 
+  // -----------------------------
+
+  status: z.enum(['PENDING', 'APPROVED', 'REJECTED']).default('PENDING'),
   isVerified: z.boolean().default(false),
-  createdAt: z.any(),
-  leadCount: z.number().optional(),
-  viewCount: z.number().optional(),
-  lastViewedAt: z.any().optional(),
-  status: z.enum(['pending', 'active', 'rejected']).default('pending'),
-  approvedAt: z.any().optional(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
 });
 
-export type Hunt = z.infer<typeof HuntSchema>;
+export type HuntFormData = z.infer<typeof HuntSchema>;
