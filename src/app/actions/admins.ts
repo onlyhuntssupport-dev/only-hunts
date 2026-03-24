@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { adminDb, adminAuth } from "@/lib/firebase/admin";
 
+// --- ADMIN MANAGEMENT ACTIONS ---
+
 export async function createAdmin(formData: FormData) {
   try {
     const name = formData.get("name") as string;
@@ -59,10 +61,9 @@ export async function deleteAdmin(adminId: string) {
     console.error("Error deleting admin:", error);
     return { success: false, error: error.message || "Failed to delete admin." };
   }
-}"use server";
+}
 
-import { adminDb } from "@/lib/firebase/admin";
-import { revalidatePath } from "next/cache";
+// --- PLATFORM APPROVAL & VERIFICATION ACTIONS ---
 
 // 1. Verify an Outfitter
 export async function verifyOutfitter(outfitterId: string) {
@@ -79,7 +80,7 @@ export async function verifyOutfitter(outfitterId: string) {
   }
 }
 
-// 2. Reject an Outfitter (Added to prevent build crashes if a reject button exists)
+// 2. Reject an Outfitter
 export async function rejectOutfitter(outfitterId: string) {
   try {
     await adminDb.collection("users").doc(outfitterId).update({
