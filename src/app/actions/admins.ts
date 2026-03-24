@@ -59,4 +59,67 @@ export async function deleteAdmin(adminId: string) {
     console.error("Error deleting admin:", error);
     return { success: false, error: error.message || "Failed to delete admin." };
   }
+}"use server";
+
+import { adminDb } from "@/lib/firebase/admin";
+import { revalidatePath } from "next/cache";
+
+// 1. Verify an Outfitter
+export async function verifyOutfitter(outfitterId: string) {
+  try {
+    await adminDb.collection("users").doc(outfitterId).update({
+      status: "ACTIVE",
+      isVerified: true,
+      updatedAt: new Date().toISOString()
+    });
+    revalidatePath("/admin/verifications");
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+// 2. Reject an Outfitter (Added to prevent build crashes if a reject button exists)
+export async function rejectOutfitter(outfitterId: string) {
+  try {
+    await adminDb.collection("users").doc(outfitterId).update({
+      status: "REJECTED",
+      isVerified: false,
+      updatedAt: new Date().toISOString()
+    });
+    revalidatePath("/admin/verifications");
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+// 3. Approve a Hunt Package
+export async function approveHuntListing(huntId: string) {
+  try {
+    await adminDb.collection("hunts").doc(huntId).update({
+      status: "APPROVED",
+      updatedAt: new Date().toISOString()
+    });
+    revalidatePath("/admin/approvals");
+    revalidatePath("/"); // Refresh homepage to show the new hunt
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+// 4. Reject a Hunt Package
+export async function rejectHuntListing(huntId: string, reason?: string) {
+  try {
+    await adminDb.collection("hunts").doc(huntId).update({
+      status: "REJECTED",
+      rejectionReason: reason || "Did not meet platform guidelines.",
+      updatedAt: new Date().toISOString()
+    });
+    revalidatePath("/admin/approvals");
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
 }
