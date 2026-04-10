@@ -1,34 +1,40 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { auth, db } from '@/lib/firebase/client';
-import { doc, getDoc } from 'firebase/firestore';
-import { ShieldCheck, Users, LayoutDashboard, ClipboardCheck, Loader2 } from 'lucide-react';
+import { doc, getDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
+import { Shield, Store, Users, Activity, Wallet, Inbox, Loader2 } from 'lucide-react';
 
 const navLinks = [
-  { href: '/admin', label: 'Internal Team', icon: Users },
-  { href: '/admin/verifications', label: 'Verifications', icon: ShieldCheck },
-  { href: '/admin/approvals', label: 'Hunt Approvals', icon: ClipboardCheck },
-  // Add more links here as you build out the admin dashboard
+  { href: '/admin', label: 'Staff / Team', icon: Shield },
+  { href: '/admin/outfitters', label: 'Outfitters', icon: Store },
+  { href: '/admin/hunters', label: 'Hunters', icon: Users },
+  { href: '/admin/pipeline', label: 'Quote Flow', icon: Activity },
+  { href: '/admin/accounting', label: 'Accounting', icon: Wallet },
+  // FIX: Updated href to match the actual file path we just created
+  { href: '/admin/support', label: 'Support Inbox', icon: Inbox, isSupport: true }, 
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname(); 
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [loading, setLoading] = useState(true);
+  
+  // NEW: State to track open tickets globally
+  const [openTicketsCount, setOpenTicketsCount] = useState(0);
 
+  // Authentication & Authorization Listener
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
       if (!user) {
-        // Not logged in at all -> Kick to login
         router.replace('/login');
         return;
       }
 
       try {
-        // Fetch role from Firestore (The Source of Truth)
         const userDoc = await getDoc(doc(db, "users", user.uid));
         
         if (userDoc.exists()) {
@@ -36,7 +42,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           if (role === 'ADMIN' || role === 'SUPER_ADMIN' || role === 'SUPERADMIN') {
             setIsAuthorized(true);
           } else {
-            // Logged in, but NOT an admin -> Kick to home
             router.replace('/');
           }
         } else {
@@ -53,61 +58,96 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return () => unsubscribe();
   }, [router]);
 
-  // Prevent flash of unauthorized content while checking
+  // NEW: Real-time Ticket Counter Listener
+  useEffect(() => {
+    // Only fetch tickets if they are a confirmed admin
+    if (!isAuthorized) return;
+
+    const q = query(
+      collection(db, "supportTickets"), 
+      where("status", "==", "OPEN")
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setOpenTicketsCount(snapshot.docs.length);
+    }, (error) => {
+      console.error("Failed to fetch ticket count:", error);
+    });
+
+    return () => unsubscribe();
+  }, [isAuthorized]);
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-off-white dark:bg-olive flex items-center justify-center transition-colors duration-300">
+      <div className="min-h-screen bg-off-white dark:bg-stone-950 flex items-center justify-center transition-colors">
         <Loader2 className="animate-spin h-12 w-12 text-kalahari" />
       </div>
     );
   }
 
-  // Double security: render nothing if not authorized
   if (!isAuthorized) return null;
 
   return (
-    <div className="flex min-h-screen bg-off-white dark:bg-olive transition-colors duration-300">
+    <div className="flex h-screen bg-off-white dark:bg-stone-950 overflow-hidden transition-colors">
       
-      {/* DESKTOP SIDEBAR */}
-      <aside className="w-64 bg-white dark:bg-black/20 border-r-2 border-kalahari/20 dark:border-kalahari/30 p-6 hidden md:flex flex-col gap-8 sticky top-0 h-screen transition-colors shadow-sm">
+      {/* UNIFIED DESKTOP SIDEBAR */}
+      <aside className="w-20 lg:w-64 border-r-2 border-kalahari/20 bg-white dark:bg-stone-900 hidden md:flex flex-col transition-all z-20">
         
-        {/* Brand Logo */}
-        <Link href="/" className="flex items-center gap-3 group">
-          <div className="bg-kalahari text-olive font-bold font-headline h-8 w-8 flex items-center justify-center rounded shadow-sm text-lg">
+        {/* Brand Logo Header */}
+        <Link href="/" className="p-6 border-b-2 border-kalahari/10 flex items-center gap-3 hover:opacity-80 transition-opacity">
+          <div className="h-10 w-10 bg-kalahari rounded-xl flex items-center justify-center text-white font-black shrink-0">
             OH
           </div>
-          <span className="text-olive dark:text-off-white font-headline font-bold text-xl tracking-wide transition-colors">
-            Only-Hunts
+          <span className="hidden lg:block font-black font-headline text-olive dark:text-off-white uppercase tracking-tighter">
+            Admin v3.0
           </span>
         </Link>
-
-        {/* Navigation */}
-        <nav className="flex flex-col gap-4 flex-1">
-          <div className="flex flex-col gap-2">
-            <p className="px-3 text-[10px] uppercase text-olive/50 dark:text-off-white/40 font-black tracking-widest mb-1 transition-colors">
-              Management
-            </p>
-            {navLinks.map(link => (
-              <Link 
-                key={link.href}
-                href={link.href}
-                className="flex items-center gap-3 px-3 py-2.5 text-sm font-bold rounded-lg text-olive/70 dark:text-off-white/60 hover:bg-kalahari/10 dark:hover:bg-kalahari/20 hover:text-olive dark:hover:text-kalahari transition-all"
-              >
-                <link.icon className="h-4 w-4" />
-                <span>{link.label}</span>
-              </Link>
-            ))}
-          </div>
-        </nav>
         
+        {/* Navigation Map */}
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+          {navLinks.map(link => {
+            const isActive = pathname === link.href;
+            
+            return (
+              <Link 
+                key={link.href} 
+                href={link.href}
+                className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-xl font-black text-sm uppercase tracking-tighter transition-all ${
+                  isActive 
+                  ? 'bg-kalahari text-white shadow-lg' 
+                  : 'text-olive/50 dark:text-white/40 hover:bg-kalahari/10'
+                }`}
+              >
+                <div className="relative">
+                  <link.icon className="h-5 w-5 shrink-0" />
+                  {/* MOBILE BADGE (When sidebar is collapsed) */}
+                  {link.isSupport && openTicketsCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-3 w-3 lg:hidden">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                    </span>
+                  )}
+                </div>
+                
+                {/* DESKTOP LABEL & BADGE */}
+                <span className="hidden lg:flex items-center justify-between flex-1">
+                  {link.label}
+                  {link.isSupport && openTicketsCount > 0 && (
+                    <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full font-black animate-in zoom-in">
+                      {openTicketsCount}
+                    </span>
+                  )}
+                </span>
+              </Link>
+            );
+          })}
+        </nav>
       </aside>
 
-      {/* MAIN CONTENT AREA */}
-      <div className="flex flex-col flex-1 min-w-0">
-        <main className="flex-1 transition-colors">
-          {children}
-        </main>
-      </div>
+      {/* DYNAMIC PAGE CONTENT */}
+      <main className="flex-1 flex flex-col relative overflow-y-auto">
+        {children}
+      </main>
 
     </div>
   );

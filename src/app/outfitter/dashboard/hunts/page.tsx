@@ -3,15 +3,16 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { auth, db } from "@/lib/firebase/client";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, deleteDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, Plus, PackageOpen, Clock, CheckCircle, MapPin, DollarSign, Image as ImageIcon } from "lucide-react";
+import { Loader2, Plus, PackageOpen, Clock, CheckCircle, MapPin, DollarSign, Image as ImageIcon, Edit, Trash2 } from "lucide-react";
 
 interface Hunt {
   id: string;
   title: string;
   price: number;
+  basePrice?: number;
   location: string;
   duration: number;
   status: string; // PENDING, APPROVED, REJECTED
@@ -22,6 +23,7 @@ export default function OutfitterHuntsPage() {
   const [hunts, setHunts] = useState<Hunt[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchHunts = async () => {
@@ -38,7 +40,7 @@ export default function OutfitterHuntsPage() {
           ...doc.data()
         })) as Hunt[];
         
-        // Sort manually by creation date (newest first) since we didn't build a complex Firestore index yet
+        // Sort manually by creation date (newest first)
         fetchedHunts.sort((a: any, b: any) => {
           const dateA = new Date(a.createdAt || 0).getTime();
           const dateB = new Date(b.createdAt || 0).getTime();
@@ -56,6 +58,24 @@ export default function OutfitterHuntsPage() {
 
     fetchHunts();
   }, []);
+
+  // --- NEW DELETE LOGIC ---
+  const handleDelete = async (id: string, title: string) => {
+    const confirmDelete = window.confirm(`Are you sure you want to permanently delete "${title}"? This action cannot be undone.`);
+    
+    if (!confirmDelete) return;
+
+    setIsDeleting(id);
+    try {
+      await deleteDoc(doc(db, "hunts", id));
+      setHunts(prev => prev.filter(hunt => hunt.id !== id));
+    } catch (err) {
+      console.error("Error deleting hunt:", err);
+      alert("Failed to delete package. Please try again.");
+    } finally {
+      setIsDeleting(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -158,14 +178,27 @@ export default function OutfitterHuntsPage() {
                   </div>
                   <div className="flex items-center text-sm font-black text-olive dark:text-off-white pt-3 mt-3 border-t border-kalahari/10">
                     <DollarSign className="h-4 w-4 mr-1 text-kalahari" />
-                    {hunt.price.toLocaleString()}
+                    {(hunt.price || hunt.basePrice || 0).toLocaleString()}
                   </div>
                 </div>
 
-                {/* Edit Button Placeholder */}
-                <Button variant="outline" className="w-full mt-5 border-kalahari/50 text-olive dark:text-off-white hover:bg-kalahari/10 font-bold" onClick={() => alert("Edit feature coming soon!")}>
-                  Manage Package
-                </Button>
+                {/* --- NEW ACTION BUTTONS --- */}
+                <div className="mt-5 grid grid-cols-2 gap-3 border-t border-kalahari/10 pt-4">
+                  <Link 
+                    href={`/outfitter/dashboard/hunts/${hunt.id}/edit`}
+                    className="flex items-center justify-center gap-2 bg-off-white dark:bg-stone-800 text-olive dark:text-white font-bold py-2.5 rounded-lg border border-kalahari/20 hover:border-kalahari transition-colors text-sm"
+                  >
+                    <Edit className="h-4 w-4" /> Edit
+                  </Link>
+                  <button 
+                    onClick={() => handleDelete(hunt.id, hunt.title)}
+                    disabled={isDeleting === hunt.id}
+                    className="flex items-center justify-center gap-2 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 font-bold py-2.5 rounded-lg border border-red-200 dark:border-red-900/50 transition-colors text-sm disabled:opacity-50"
+                  >
+                    {isDeleting === hunt.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Trash2 className="h-4 w-4" /> Delete</>}
+                  </button>
+                </div>
+
               </CardContent>
             </Card>
           ))}

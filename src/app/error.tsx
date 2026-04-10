@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
+import { useEffect } from "react";
 
 export default function GlobalError({
   error,
@@ -10,19 +10,21 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error("Global App Error Caught:", error);
+    console.error(error);
   }, [error]);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-off-white text-olive dark:text-off-white p-4">
-      <h2 className="text-2xl font-bold mb-4">Something went wrong!</h2>
-      <p className="mb-6 opacity-70">{error.message}</p>
-      <button
-        onClick={() => reset()}
-        className="px-4 py-2 bg-olive text-white rounded hover:bg-olive/80"
-      >
-        Try again
-      </button>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-stone-950 text-white p-4">
+      <div className="bg-black/50 border border-red-500/30 p-8 rounded-2xl max-w-lg text-center">
+        <h2 className="text-2xl font-bold mb-4 text-red-500">System Error</h2>
+        <p className="text-stone-400 mb-6">Something went wrong while loading this page.</p>
+        <button
+          onClick={() => reset()}
+          className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition-colors"
+        >
+          Try Again
+        </button>
+      </div>
     </div>
   );
 }

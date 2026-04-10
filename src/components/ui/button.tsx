@@ -1,13 +1,14 @@
 import * as React from "react"
-import { slot } from "lucide-react" // Optional: if using Slot for Radix
+import { Slot } from "@radix-ui/react-slot"
 
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'outline' | 'ghost' | 'destructive';
   size?: 'sm' | 'md' | 'lg' | 'icon';
+  asChild?: boolean;
 }
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = 'primary', size = 'md', ...props }, ref) => {
+  ({ className, variant = 'primary', size = 'md', asChild = false, ...props }, ref) => {
     const baseStyles = "inline-flex items-center justify-center rounded-md font-medium transition-colors focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50";
     
     const variants = {
@@ -26,7 +27,9 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
     const combinedClassName = `${baseStyles} ${variants[variant]} ${sizes[size]} ${className || ""}`;
 
-    return <button ref={ref} className={combinedClassName} {...props} />;
+    const Comp = asChild ? Slot : "button"
+
+    return <Comp ref={ref} className={combinedClassName} {...props} />;
   }
 );
 Button.displayName = "Button";

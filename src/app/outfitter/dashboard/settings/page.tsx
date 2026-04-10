@@ -1,246 +1,406 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { auth, db, storage } from "@/lib/firebase/client"; 
+import { useState, useEffect } from "react";
+import { auth, db, storage } from "@/lib/firebase/client";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage"; 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Save, User, Building, Mail, Camera, ShieldAlert } from "lucide-react";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import { 
+  Save, User, MapPin, Home, Map, Medal, Image as ImageIcon, 
+  CheckCircle, Loader2, X, UploadCloud, AlertCircle 
+} from "lucide-react";
+import KuduLoader from "@/components/ui/KuduLoader";
+
+const ACCREDITATION_OPTIONS = [
+  "PHASA (Professional Hunters' Association of South Africa)",
+  "SCI (Safari Club International)",
+  "WRSA (Wildlife Ranching South Africa)",
+  "CHASA (Confederation of Hunting Associations of SA)",
+  "DSC (Dallas Safari Club)",
+  "Local Nature Conservation Approved"
+];
+
+const SA_PROVINCES = [
+  "Eastern Cape",
+  "Free State",
+  "Gauteng",
+  "KwaZulu-Natal",
+  "Limpopo",
+  "Mpumalanga",
+  "Northern Cape",
+  "North West",
+  "Western Cape"
+];
 
 export default function OutfitterSettingsPage() {
-  const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState({ type: "", text: "" });
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [error, setError] = useState("");
+  const [uploadingImage, setUploadingImage] = useState(false);
 
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-
+  // --- FORM STATE ---
   const [formData, setFormData] = useState({
-    name: "",
     companyName: "",
-    email: "", 
+    location: "",
+    yearsInBusiness: "",
     bio: "",
+    campType: "",
+    terrain: "",
+    accreditations: [] as string[],
     profileImageUrl: "",
+    gallery: [] as string[],
   });
 
   useEffect(() => {
-    const fetchUserData = async () => {
-      if (!auth.currentUser) return;
+    const loadProfile = async () => {
+      const user = auth.currentUser;
+      if (!user) return;
+
       try {
-        const userDocRef = doc(db, "users", auth.currentUser.uid);
-        const userDoc = await getDoc(userDocRef);
-        
-        if (userDoc.exists()) {
-          const data = userDoc.data();
+        const docRef = doc(db, "users", user.uid);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+          const data = docSnap.data();
           setFormData({
-            name: data.name || "",
             companyName: data.companyName || data.name || "",
-            email: data.email || auth.currentUser.email || "",
+            location: data.location || "",
+            yearsInBusiness: data.yearsInBusiness || "",
             bio: data.bio || "",
+            campType: data.campType || "",
+            terrain: data.terrain || "",
+            accreditations: data.accreditations || [],
             profileImageUrl: data.profileImageUrl || "",
+            gallery: data.gallery || [],
           });
-          if (data.profileImageUrl) setImagePreview(data.profileImageUrl);
-        } else {
-          setFormData(prev => ({ ...prev, email: auth.currentUser?.email || "" }));
         }
-      } catch (error) {
-        console.error("Error fetching profile:", error);
+      } catch (err) {
+        console.error("Error loading profile:", err);
+        setError("Failed to load your profile data.");
       } finally {
-        setLoading(false);
+        setIsLoading(false);
       }
     };
 
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      if (user) fetchUserData();
-      else setLoading(false);
-    });
-
-    return () => unsubscribe();
+    const timer = setTimeout(() => loadProfile(), 500);
+    return () => clearTimeout(timer);
   }, []);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  // --- HANDLERS ---
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setImageFile(file);
-      setImagePreview(URL.createObjectURL(file)); 
-    }
+  const toggleAccreditation = (accreditation: string) => {
+    setFormData((prev) => {
+      const exists = prev.accreditations.includes(accreditation);
+      if (exists) {
+        return { ...prev, accreditations: prev.accreditations.filter(a => a !== accreditation) };
+      } else {
+        return { ...prev, accreditations: [...prev.accreditations, accreditation] };
+      }
+    });
   };
 
-  const containsRestrictedContent = (text: string) => {
-    if (!text) return false;
-    const phoneRegex = /(?:[-+() ]*\d){8,}/;
-    const urlRegex = /([a-zA-Z0-9\-]+\.(com|co\.za|net|org|info|biz|me|za))|(https?:\/\/)|(www\.)/i;
-    const emailRegex = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/i;
-    return phoneRegex.test(text) || urlRegex.test(text) || emailRegex.test(text);
-  };
+  // --- IMAGE UPLOAD LOGIC ---
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'profile' | 'gallery') => {
+    const user = auth.currentUser;
+    if (!user || !e.target.files || e.target.files.length === 0) return;
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (containsRestrictedContent(formData.bio) || containsRestrictedContent(formData.companyName)) {
-      setMessage({ 
-        type: "error", 
-        text: "Platform Security: Phone numbers, emails, and website links are not allowed in your Company Name or Bio. Please remove them to save." 
-      });
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      return; 
-    }
-
-    if (!auth.currentUser) return;
-    setSaving(true);
-    setMessage({ type: "", text: "" });
+    setUploadingImage(true);
+    setError("");
 
     try {
-      let finalImageUrl = formData.profileImageUrl;
+      const files = Array.from(e.target.files);
+      const uploadedUrls: string[] = [];
 
-      if (imageFile) {
-        const fileExt = imageFile.name.split('.').pop();
-        const fileName = `profiles/${auth.currentUser.uid}_${Date.now()}.${fileExt}`;
-        const storageRef = ref(storage, fileName);
-        await uploadBytes(storageRef, imageFile);
-        finalImageUrl = await getDownloadURL(storageRef);
+      for (const file of files) {
+        const fileExtension = file.name.split('.').pop();
+        const filePath = `outfitters/${user.uid}/${type}_${Date.now()}.${fileExtension}`;
+        const storageRef = ref(storage, filePath);
+
+        const snapshot = await uploadBytes(storageRef, file);
+        const downloadUrl = await getDownloadURL(snapshot.ref);
+        uploadedUrls.push(downloadUrl);
       }
 
-      const userDocRef = doc(db, "users", auth.currentUser.uid);
-      await updateDoc(userDocRef, {
-        name: formData.name,
-        companyName: formData.companyName,
-        bio: formData.bio,
-        profileImageUrl: finalImageUrl,
-        updatedAt: new Date().toISOString(),
-      });
-      
-      setFormData(prev => ({ ...prev, profileImageUrl: finalImageUrl }));
-      setImageFile(null); 
-      setMessage({ type: "success", text: "Profile updated successfully. Redirecting to your public storefront..." });
-      
-      // --- THE DOPAMINE LOOP: Redirect them to their live storefront after 1.5 seconds ---
-      setTimeout(() => {
-        router.push(`/outfitters/${auth.currentUser?.uid}`);
-      }, 1500);
+      if (type === 'profile') {
+        setFormData(prev => ({ ...prev, profileImageUrl: uploadedUrls[0] }));
+      } else {
+        setFormData(prev => ({ ...prev, gallery: [...prev.gallery, ...uploadedUrls] }));
+      }
 
-    } catch (error: any) {
-      console.error("Error updating profile:", error);
-      setMessage({ type: "error", text: "Failed to update profile. Please try again." });
-      setSaving(false);
-    } 
+    } catch (err: any) {
+      console.error("Upload error:", err);
+      setError("Failed to upload image. Please ensure it is a valid format and under 5MB.");
+    } finally {
+      setUploadingImage(false);
+    }
   };
 
-  if (loading) {
-    return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <Loader2 className="animate-spin h-10 w-10 text-kalahari" />
-      </div>
-    );
-  }
+  const removeGalleryImage = (urlToRemove: string) => {
+    setFormData(prev => ({
+      ...prev,
+      gallery: prev.gallery.filter(url => url !== urlToRemove)
+    }));
+  };
+
+  // --- SAVE LOGIC ---
+  const handleSave = async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    setIsSaving(true);
+    setSaveSuccess(false);
+    setError("");
+
+    try {
+      const docRef = doc(db, "users", user.uid);
+      await updateDoc(docRef, {
+        companyName: formData.companyName,
+        location: formData.location,
+        yearsInBusiness: formData.yearsInBusiness,
+        bio: formData.bio,
+        campType: formData.campType,
+        terrain: formData.terrain,
+        accreditations: formData.accreditations,
+        profileImageUrl: formData.profileImageUrl,
+        gallery: formData.gallery,
+        updatedAt: new Date().toISOString(),
+      });
+
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (err) {
+      console.error("Error saving profile:", err);
+      setError("Failed to save changes. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (isLoading) return <div className="min-h-[60vh] flex items-center justify-center"><KuduLoader /></div>;
 
   return (
-    <div className="space-y-8 max-w-4xl mx-auto">
-      <div className="border-b-2 border-kalahari/30 pb-6">
-        <h1 className="text-4xl font-headline font-bold text-olive dark:text-off-white tracking-tight">Profile Management</h1>
-        <p className="text-olive dark:text-off-white/70 mt-2 text-lg font-medium">
-          Manage how your business appears to hunters on the platform.
-        </p>
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 pb-16 transition-colors duration-300">
+      
+      <div className="mb-8">
+        <h1 className="text-3xl md:text-4xl font-black font-headline text-olive dark:text-off-white tracking-tight">Business Profile</h1>
+        <p className="text-olive/70 dark:text-off-white/60 font-medium mt-2">Manage how your outfit appears to hunters on the marketplace.</p>
       </div>
 
-      {message.text && (
-        <div className={`p-4 rounded-lg border-2 font-bold shadow-sm transition-all flex items-start gap-3 ${
-          message.type === "success" 
-            ? "bg-green-50 text-green-800 border-green-200" 
-            : "bg-red-50 text-red-800 border-red-200"
-        }`}>
-          {message.type === "error" && <ShieldAlert className="h-5 w-5 shrink-0 mt-0.5" />}
-          <p>{message.text}</p>
+      {error && (
+        <div className="mb-6 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 rounded-r-xl flex items-start gap-3">
+          <AlertCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+          <p className="text-sm font-bold text-red-800 dark:text-red-400">{error}</p>
         </div>
       )}
 
-      <form onSubmit={handleSave} className="bg-white border-2 border-kalahari/30 rounded-xl p-6 md:p-8 shadow-sm space-y-10">
+      <div className="space-y-8">
         
-        {/* Profile Picture Section */}
-        <div className="flex flex-col sm:flex-row items-center gap-6 pb-8 border-b border-kalahari/20">
-          <div className="relative h-28 w-28 rounded-full border-4 border-off-white shadow-md bg-kalahari/20 flex items-center justify-center overflow-hidden shrink-0">
-            {imagePreview ? (
-              <img src={imagePreview} alt="Profile Preview" className="h-full w-full object-cover" />
-            ) : (
-              <User className="h-12 w-12 text-olive dark:text-off-white/30" />
-            )}
-            <input type="file" id="profileImage" accept="image/*" className="hidden" onChange={handleImageSelect} />
-          </div>
+        {/* SECTION 1: CORE BUSINESS INFO */}
+        <section className="bg-white dark:bg-stone-900 border border-kalahari/20 rounded-2xl p-6 md:p-8 shadow-sm">
+          <h2 className="text-xl font-black text-olive dark:text-off-white border-b border-kalahari/10 pb-4 mb-6 flex items-center gap-2">
+            <User className="h-5 w-5 text-kalahari" /> Core Information
+          </h2>
           
-          <div className="text-center sm:text-left">
-            <h2 className="text-xl font-bold font-headline text-olive dark:text-off-white mb-1">Profile Photo</h2>
-            <p className="text-sm text-olive dark:text-off-white/60 font-medium mb-3 max-w-sm">
-              Upload a clear photo of yourself or your company logo. This helps build trust with hunters.
-            </p>
-            <label htmlFor="profileImage" className="inline-flex items-center gap-2 px-4 py-2 bg-off-white hover:bg-kalahari/20 text-olive dark:text-off-white border-2 border-kalahari/50 rounded-md font-bold text-sm cursor-pointer transition-colors shadow-sm">
-              <Camera className="h-4 w-4 text-kalahari" />
-              {imagePreview ? "Change Photo" : "Upload Photo"}
-            </label>
-          </div>
-        </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="md:col-span-2">
+              <label className="block text-xs font-bold text-olive/60 dark:text-off-white/50 uppercase tracking-widest mb-2">Company Name</label>
+              <input 
+                type="text" name="companyName" value={formData.companyName} onChange={handleInputChange}
+                className="w-full bg-off-white dark:bg-stone-950 border border-kalahari/20 rounded-xl p-3 text-olive dark:text-white outline-none focus:ring-2 focus:ring-kalahari font-bold"
+                placeholder="e.g. Kalahari Big Game Safaris"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-xs font-bold text-olive/60 dark:text-off-white/50 uppercase tracking-widest mb-2">Primary Location (Province/Region)</label>
+              <div className="relative">
+                <MapPin className="absolute left-3 top-3.5 h-5 w-5 text-kalahari/50 pointer-events-none" />
+                <select 
+                  name="location" 
+                  value={formData.location} 
+                  onChange={handleInputChange}
+                  className="w-full bg-off-white dark:bg-stone-950 border border-kalahari/20 rounded-xl p-3 pl-10 text-olive dark:text-white outline-none focus:ring-2 focus:ring-kalahari font-medium appearance-none"
+                >
+                  <option value="" disabled>Select Province...</option>
+                  {SA_PROVINCES.map(prov => (
+                    <option key={prov} value={prov}>{prov}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
 
-        {/* Personal Details */}
-        <div className="space-y-4">
-          <h2 className="text-xl font-bold font-headline text-olive dark:text-off-white border-b border-kalahari/20 pb-2">Personal Details</h2>
+            <div>
+              <label className="block text-xs font-bold text-olive/60 dark:text-off-white/50 uppercase tracking-widest mb-2">Years in Business</label>
+              <input 
+                type="text" name="yearsInBusiness" value={formData.yearsInBusiness} onChange={handleInputChange}
+                className="w-full bg-off-white dark:bg-stone-950 border border-kalahari/20 rounded-xl p-3 text-olive dark:text-white outline-none focus:ring-2 focus:ring-kalahari font-medium"
+                placeholder="e.g. Est. 1998 or 25 Years"
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-xs font-bold text-olive/60 dark:text-off-white/50 uppercase tracking-widest mb-2">About the Outfitter (Bio)</label>
+              <textarea 
+                name="bio" value={formData.bio} onChange={handleInputChange}
+                className="w-full h-32 bg-off-white dark:bg-stone-950 border border-kalahari/20 rounded-xl p-3 text-olive dark:text-white outline-none focus:ring-2 focus:ring-kalahari font-medium resize-none"
+                placeholder="Tell hunters about your history, your team, and what makes your safaris unique..."
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* SECTION 2: CAMP & TERRAIN */}
+        <section className="bg-white dark:bg-stone-900 border border-kalahari/20 rounded-2xl p-6 md:p-8 shadow-sm">
+          <h2 className="text-xl font-black text-olive dark:text-off-white border-b border-kalahari/10 pb-4 mb-6 flex items-center gap-2">
+            <Home className="h-5 w-5 text-kalahari" /> Camp & Terrain
+          </h2>
+          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-bold text-olive dark:text-off-white mb-1.5 flex items-center gap-2">
-                <User className="h-4 w-4 text-kalahari" /> Full Name
-              </label>
-              <Input name="name" value={formData.name} onChange={handleChange} required className="h-12 border-kalahari/50 focus-visible:ring-olive font-medium" />
+              <label className="block text-xs font-bold text-olive/60 dark:text-off-white/50 uppercase tracking-widest mb-2 flex items-center gap-2"><Home className="h-4 w-4" /> Accommodation Type</label>
+              <select 
+                name="campType" value={formData.campType} onChange={handleInputChange}
+                className="w-full bg-off-white dark:bg-stone-950 border border-kalahari/20 rounded-xl p-3 text-olive dark:text-white outline-none focus:ring-2 focus:ring-kalahari font-medium appearance-none"
+              >
+                <option value="">Select Lodge Type...</option>
+                <option value="5-Star Luxury Lodge">5-Star Luxury Lodge</option>
+                <option value="Premium Safari Lodge">Premium Safari Lodge</option>
+                <option value="Traditional Tented Camp">Traditional Tented Camp</option>
+                <option value="Rustic Bush Camp">Rustic Bush Camp</option>
+                <option value="Farmhouse / Guesthouse">Farmhouse / Guesthouse</option>
+              </select>
             </div>
+            
             <div>
-              <label className="block text-sm font-bold text-olive dark:text-off-white mb-1.5 flex items-center gap-2">
-                <Mail className="h-4 w-4 text-kalahari" /> Email Address
-              </label>
-              <Input name="email" value={formData.email} disabled className="h-12 border-kalahari/50 bg-off-white text-olive dark:text-off-white/60 font-medium cursor-not-allowed" title="Email cannot be changed here" />
-            </div>
-          </div>
-        </div>
-
-        {/* Business Details */}
-        <div className="space-y-4">
-          <h2 className="text-xl font-bold font-headline text-olive dark:text-off-white border-b border-kalahari/20 pb-2">Business Profile</h2>
-          <div className="grid grid-cols-1 gap-6">
-            <div className="md:col-span-1">
-              <label className="block text-sm font-bold text-olive dark:text-off-white mb-1.5 flex items-center gap-2">
-                <Building className="h-4 w-4 text-kalahari" /> Outfitter / Company Name
-              </label>
-              <Input name="companyName" value={formData.companyName} onChange={handleChange} required className="h-12 border-kalahari/50 focus-visible:ring-olive font-medium" />
-            </div>
-
-            <div className="md:col-span-1">
-              <label className="block text-sm font-bold text-olive dark:text-off-white mb-1.5">Company Bio / Description</label>
-              <Textarea 
-                name="bio" 
-                value={formData.bio} 
-                onChange={handleChange} 
-                rows={5}
-                placeholder="Tell hunters a bit about your operation, history, and what makes your hunts special..."
-                className="border-kalahari/50 focus-visible:ring-olive font-medium text-base resize-none" 
+              <label className="block text-xs font-bold text-olive/60 dark:text-off-white/50 uppercase tracking-widest mb-2 flex items-center gap-2"><Map className="h-4 w-4" /> Primary Terrain</label>
+              <input 
+                type="text" name="terrain" value={formData.terrain} onChange={handleInputChange}
+                className="w-full bg-off-white dark:bg-stone-950 border border-kalahari/20 rounded-xl p-3 text-olive dark:text-white outline-none focus:ring-2 focus:ring-kalahari font-medium"
+                placeholder="e.g. Thick Bushveld, Open Plains, Mountainous"
               />
-              <p className="text-[11px] font-bold text-olive dark:text-off-white/60 mt-2 uppercase tracking-wide">
-                * Note: For platform security, phone numbers, emails, and website links are strictly prohibited in your bio.
-              </p>
             </div>
           </div>
+        </section>
+
+        {/* SECTION 3: ACCREDITATIONS */}
+        <section className="bg-white dark:bg-stone-900 border border-kalahari/20 rounded-2xl p-6 md:p-8 shadow-sm">
+          <h2 className="text-xl font-black text-olive dark:text-off-white border-b border-kalahari/10 pb-4 mb-6 flex items-center gap-2">
+            <Medal className="h-5 w-5 text-kalahari" /> Professional Accreditations
+          </h2>
+          <p className="text-sm text-olive/70 dark:text-off-white/60 font-medium mb-6">Select the professional hunting organizations you are actively registered with. These build significant trust with international clients.</p>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {ACCREDITATION_OPTIONS.map((option) => (
+              <label key={option} className="flex items-start gap-3 p-3 rounded-xl border border-kalahari/10 hover:border-kalahari/30 bg-off-white/50 dark:bg-stone-950/50 cursor-pointer transition-colors group">
+                <input 
+                  type="checkbox" 
+                  checked={formData.accreditations.includes(option)}
+                  onChange={() => toggleAccreditation(option)}
+                  className="mt-1 h-5 w-5 rounded border-gray-300 text-kalahari focus:ring-kalahari bg-white dark:bg-stone-900"
+                />
+                <span className="text-sm font-bold text-olive dark:text-white group-hover:text-kalahari transition-colors">{option}</span>
+              </label>
+            ))}
+          </div>
+        </section>
+
+        {/* SECTION 4: MEDIA & BRANDING */}
+        <section className="bg-white dark:bg-stone-900 border border-kalahari/20 rounded-2xl p-6 md:p-8 shadow-sm">
+          <h2 className="text-xl font-black text-olive dark:text-off-white border-b border-kalahari/10 pb-4 mb-6 flex items-center gap-2">
+            <ImageIcon className="h-5 w-5 text-kalahari" /> Media & Branding
+          </h2>
+          
+          <div className="space-y-10">
+            {/* Profile Picture */}
+            <div>
+              <label className="block text-sm font-bold text-olive dark:text-white mb-4">Outfitter Logo / Profile Picture</label>
+              <div className="flex items-center gap-6">
+                <div className="h-24 w-24 rounded-2xl border-2 border-dashed border-kalahari/50 overflow-hidden bg-off-white dark:bg-stone-950 flex items-center justify-center shrink-0">
+                  {formData.profileImageUrl ? (
+                    <img src={formData.profileImageUrl} alt="Profile" className="h-full w-full object-cover" />
+                  ) : (
+                    <User className="h-8 w-8 text-kalahari/30" />
+                  )}
+                </div>
+                <div>
+                  <input type="file" id="profile-upload" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, 'profile')} />
+                  <label htmlFor="profile-upload" className="inline-flex items-center gap-2 px-4 py-2 bg-off-white dark:bg-stone-800 border border-kalahari/20 text-olive dark:text-white font-bold rounded-lg cursor-pointer hover:bg-kalahari/10 transition-colors">
+                    <UploadCloud className="h-4 w-4 text-kalahari" /> {uploadingImage ? "Uploading..." : "Upload Logo"}
+                  </label>
+                  <p className="text-xs text-olive/50 dark:text-off-white/40 mt-2 font-medium">Recommended: Square image, max 2MB.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Trophy Room Gallery */}
+            <div className="pt-8 border-t border-kalahari/10">
+              <div className="flex justify-between items-end mb-4">
+                <div>
+                  <label className="block text-sm font-bold text-olive dark:text-white">Trophy Room Gallery</label>
+                  <p className="text-xs text-olive/60 dark:text-off-white/50 font-medium mt-1">Upload high-quality photos of your lodge and successful hunts.</p>
+                </div>
+                <input type="file" id="gallery-upload" accept="image/*" multiple className="hidden" onChange={(e) => handleImageUpload(e, 'gallery')} />
+                <label htmlFor="gallery-upload" className="inline-flex items-center gap-2 px-4 py-2 bg-kalahari hover:bg-kalahari/90 text-white font-bold rounded-lg cursor-pointer transition-colors shadow-sm text-sm">
+                  <UploadCloud className="h-4 w-4" /> Add Photos
+                </label>
+              </div>
+
+              {formData.gallery.length === 0 ? (
+                <div className="w-full py-12 border-2 border-dashed border-kalahari/20 rounded-xl bg-off-white/50 dark:bg-stone-950/50 flex flex-col items-center justify-center text-olive/40 dark:text-white/30">
+                  <ImageIcon className="h-10 w-10 mb-2 opacity-50" />
+                  <span className="text-sm font-bold">No gallery images uploaded yet</span>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                  {formData.gallery.map((url, i) => (
+                    <div key={i} className="relative aspect-square rounded-xl overflow-hidden border border-kalahari/20 group">
+                      <img src={url} alt={`Gallery ${i}`} className="h-full w-full object-cover" />
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <button 
+                          onClick={() => removeGalleryImage(url)}
+                          className="bg-red-500 hover:bg-red-600 text-white p-2 rounded-full shadow-lg transform scale-90 group-hover:scale-100 transition-all"
+                          title="Remove Image"
+                        >
+                          <X className="h-5 w-5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {uploadingImage && (
+                    <div className="aspect-square rounded-xl border-2 border-dashed border-kalahari/50 flex items-center justify-center bg-kalahari/5">
+                      <Loader2 className="h-8 w-8 text-kalahari animate-spin" />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* PERMANENT SAVE SECTION */}
+        <div className="mt-8 bg-white dark:bg-stone-900 border-2 border-kalahari/30 rounded-2xl p-6 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4 transition-colors">
+          <div className="text-olive/70 dark:text-gray-400 text-sm font-bold text-center sm:text-left">
+            Unsaved changes will be lost. Make sure to save your profile.
+          </div>
+          <button 
+            onClick={handleSave}
+            disabled={isSaving || uploadingImage}
+            className="w-full sm:w-auto bg-kalahari hover:bg-kalahari/90 text-white font-black px-10 py-4 rounded-xl flex items-center justify-center gap-2 shadow-md transition-all disabled:opacity-50"
+          >
+            {isSaving ? (
+              <><Loader2 className="h-5 w-5 animate-spin" /> Saving Profile...</>
+            ) : saveSuccess ? (
+              <><CheckCircle className="h-5 w-5" /> Profile Updated</>
+            ) : (
+              <><Save className="h-5 w-5" /> Save Changes</>
+            )}
+          </button>
         </div>
 
-        <div className="pt-4 flex justify-end">
-          <Button type="submit" disabled={saving} className="bg-olive hover:bg-olive/90 text-kalahari font-black text-lg h-12 px-8 shadow-md transition-all flex items-center gap-2">
-            {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
-            {saving ? "Saving..." : "Save Changes"}
-          </Button>
-        </div>
-      </form>
+      </div>
     </div>
   );
 }

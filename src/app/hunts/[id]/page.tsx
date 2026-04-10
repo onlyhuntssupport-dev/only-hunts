@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { adminDb } from '@/lib/firebase/admin';
-import { ShieldCheck, MapPin, Target, Compass, ArrowLeft, User, Calendar, DollarSign, CheckCircle2, XCircle, PlusCircle } from 'lucide-react';
+import { ShieldCheck, MapPin, Target, Compass, ArrowLeft, User, Calendar, DollarSign, CheckCircle2, XCircle, PlusCircle, LayoutGrid, ArrowRight } from 'lucide-react';
 
 // Custom Components
 import ClientWishlistLoader from '@/components/marketplace/ClientWishlistLoader';
@@ -52,6 +52,7 @@ export default async function HuntDetailPage({ params }: Props) {
     notFound();
   }
   
+  // 1. Fetch Outfitter Profile Image
   let outfitterImage = null;
   if (huntData.outfitterId) {
     try {
@@ -64,221 +65,323 @@ export default async function HuntDetailPage({ params }: Props) {
     }
   }
 
-  const displayImage = huntData.coverImage || huntData.imageUrl || (huntData.images && huntData.images[0]);
+  // 2. Fetch More Packages from this Outfitter
+  let otherPackages: any[] = [];
+  if (huntData.outfitterId) {
+    try {
+      const otherHuntsSnapshot = await adminDb.collection('hunts')
+        .where('outfitterId', '==', huntData.outfitterId)
+        .where('status', '==', 'APPROVED')
+        .limit(4) // Fetch 4 in case one is the current package
+        .get();
+        
+      otherPackages = otherHuntsSnapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter(h => h.id !== huntData.id) // Exclude current package
+        .slice(0, 3); // Keep only up to 3
+    } catch (error) {
+      console.error("Error fetching other packages:", error);
+    }
+  }
+
+  // Aggregate all possible images for the gallery
+  const allImages: string[] = [];
+  if (huntData.coverImage) allImages.push(huntData.coverImage);
+  if (huntData.imageUrl && huntData.imageUrl !== huntData.coverImage) allImages.push(huntData.imageUrl);
+  if (huntData.images && Array.isArray(huntData.images)) {
+    huntData.images.forEach(img => {
+      if (!allImages.includes(img)) allImages.push(img);
+    });
+  }
+
   const displayPrice = huntData.price || huntData.basePrice;
 
   return (
-    <>
+    <div className="relative min-h-screen bg-olive">
       <AnalyticsTracker huntId={huntData.id} />
-      <div className="bg-off-white min-h-screen pb-16">
-        
-        {/* --- EDGE-TO-EDGE HERO BANNER (TOP BUTTON ACTUALLY REMOVED) --- */}
-        <div className="w-full h-[45vh] md:h-[60vh] relative bg-olive overflow-hidden border-b-4 border-kalahari">
-          {displayImage ? (
-            <Image 
-              src={displayImage} 
-              alt={huntData.title || "Hunting Package"} 
-              fill 
-              className="object-cover opacity-90"
-              priority
-            />
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Compass className="h-24 w-24 text-kalahari/30" />
-            </div>
-          )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
-        </div>
+      
+      {/* --- FIXED FULLSCREEN BACKGROUND --- */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        {/* Updated opacity to 40% (0.4) */}
+        <div 
+          className="absolute inset-0 z-0 bg-cover bg-[position:center_top] bg-no-repeat opacity-40"
+          style={{ backgroundImage: "url('/watering-hole.jpg')" }}
+        ></div>
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-olive/80 to-olive"></div>
+      </div>
 
-        {/* --- MAIN CONTENT (FULL WIDTH) --- */}
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 -mt-20 md:-mt-32 relative z-10 space-y-8">
+      {/* --- MAIN SCROLLING CONTENT --- */}
+      <div className="relative z-10 pb-24 text-off-white font-body pt-24">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
-          <div className="bg-white rounded-2xl shadow-xl border border-kalahari/10 p-6 sm:p-8 md:p-10">
-            <div className="flex items-start justify-between gap-4 mb-4">
-              <div>
-                {huntData.status === "PENDING" && (
-                  <span className="inline-block mb-3 bg-amber-100 text-amber-800 border border-amber-200 text-xs font-black px-3 py-1 rounded shadow-sm uppercase tracking-wide mr-2">
-                    Pending Admin Approval
-                  </span>
+          {/* Top Bar: Back Button & Title */}
+          <div className="mb-6 flex justify-between items-start">
+            <div>
+              <Link href="/marketplace" className="inline-flex items-center text-sm font-bold text-kalahari hover:text-white transition-colors mb-4 bg-black/20 backdrop-blur-sm px-3 py-1.5 rounded-full border border-kalahari/20">
+                <ArrowLeft className="h-4 w-4 mr-2" /> Back to Marketplace
+              </Link>
+              <h1 className="text-3xl md:text-5xl font-black font-headline tracking-tight drop-shadow-md">
+                {huntData.title || "Untitled Package"}
+              </h1>
+              <div className="flex items-center gap-4 mt-3 text-sm font-bold text-off-white/80 drop-shadow-sm">
+                <span className="flex items-center"><MapPin className="h-4 w-4 mr-1 text-kalahari" /> {huntData.location || huntData.province || "South Africa"}</span>
+                {huntData.promoTier === "FEATURED" && (
+                  <span className="bg-kalahari text-olive px-2 py-0.5 rounded text-[10px] uppercase tracking-widest flex items-center shadow-sm">Featured</span>
                 )}
-                <span className="inline-block mb-3 bg-olive/10 text-olive dark:text-off-white border border-olive/20 text-xs font-black px-3 py-1 rounded shadow-sm uppercase tracking-wide">
-                  Verified Package
-                </span>
-                <h1 className="text-3xl sm:text-4xl md:text-5xl font-black font-headline text-olive dark:text-off-white tracking-tight leading-tight">
-                  {huntData.title || "Untitled Package"}
-                </h1>
               </div>
-              <ClientWishlistLoader huntId={huntData.id} />
             </div>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-6 mt-6 border-t border-kalahari/10">
-              <div className="flex items-center gap-3">
-                <div className="h-12 w-12 rounded-full bg-off-white border border-kalahari/20 flex items-center justify-center shrink-0">
-                  <MapPin className="h-5 w-5 text-kalahari" />
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-olive dark:text-off-white/50 uppercase tracking-widest">Location</p>
-                  <p className="text-base font-bold text-olive dark:text-off-white">{huntData.location || huntData.province || "South Africa"}</p>
-                </div>
-              </div>
-              
-              {huntData.duration && (
-                <div className="flex items-center gap-3">
-                  <div className="h-12 w-12 rounded-full bg-off-white border border-kalahari/20 flex items-center justify-center shrink-0">
-                    <Calendar className="h-5 w-5 text-kalahari" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-olive dark:text-off-white/50 uppercase tracking-widest">Duration</p>
-                    <p className="text-base font-bold text-olive dark:text-off-white">{huntData.duration} Days</p>
-                  </div>
-                </div>
-              )}
-
-              {huntData.primarySpecies && (
-                <div className="flex items-center gap-3">
-                  <div className="h-12 w-12 rounded-full bg-off-white border border-kalahari/20 flex items-center justify-center shrink-0">
-                    <Target className="h-5 w-5 text-kalahari" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-olive dark:text-off-white/50 uppercase tracking-widest">Target Species</p>
-                    <p className="text-base font-bold text-olive dark:text-off-white line-clamp-1">{huntData.primarySpecies}</p>
-                  </div>
-                </div>
-              )}
-            </div>
+            <ClientWishlistLoader huntId={huntData.id} />
           </div>
 
-          {huntData.description && (
-            <div className="bg-white rounded-2xl shadow-sm border border-kalahari/10 p-6 sm:p-8 md:p-10">
-              <h2 className="text-xl font-black text-olive dark:text-off-white uppercase tracking-wide mb-6">Package Details</h2>
-              <div className="prose max-w-none text-olive dark:text-off-white/80 font-medium leading-relaxed whitespace-pre-wrap">
-                {huntData.description}
-              </div>
-            </div>
-          )}
-
-          {(huntData.includedItems || huntData.excludedItems) && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {huntData.includedItems && (
-                <div className="bg-green-50/30 rounded-2xl shadow-sm border border-green-100 p-6 sm:p-8">
-                  <h3 className="text-sm font-black text-green-800 uppercase tracking-wider mb-4 flex items-center gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-green-600" /> Included
-                  </h3>
-                  <div className="text-green-900/80 text-sm font-medium whitespace-pre-wrap leading-relaxed">
-                    {huntData.includedItems}
-                  </div>
-                </div>
-              )}
-              {huntData.excludedItems && (
-                <div className="bg-red-50/30 rounded-2xl shadow-sm border border-red-100 p-6 sm:p-8">
-                  <h3 className="text-sm font-black text-red-800 uppercase tracking-wider mb-4 flex items-center gap-2">
-                    <XCircle className="h-5 w-5 text-red-600" /> Excluded
-                  </h3>
-                  <div className="text-red-900/80 text-sm font-medium whitespace-pre-wrap leading-relaxed">
-                    {huntData.excludedItems}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {huntData.additionalSpecies && (
-            <div className="bg-white rounded-2xl shadow-sm border border-kalahari/10 p-6 sm:p-8 md:p-10">
-              <h3 className="text-xl font-black text-olive dark:text-off-white uppercase tracking-wide mb-4 flex items-center gap-2">
-                <PlusCircle className="h-5 w-5 text-kalahari" /> Additional Species Available
-              </h3>
-              <div className="text-olive dark:text-off-white/80 text-sm font-medium whitespace-pre-wrap leading-relaxed bg-off-white p-6 rounded-xl border border-kalahari/10">
-                {huntData.additionalSpecies}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* --- THE CHECK-OUT DESK (STRICT SIDE-BY-SIDE) --- */}
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 mb-12">
-          <div className="bg-white border-2 border-kalahari/20 shadow-xl rounded-3xl overflow-hidden">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12">
             
-            <div className="bg-olive py-6 px-8 text-center border-b-4 border-kalahari">
-              <h2 className="text-2xl md:text-3xl font-black font-headline text-kalahari">Secure Your Dates</h2>
-              <p className="text-off-white/70 font-medium mt-1">Submit a request to lock in this package directly with the outfitter.</p>
+            {/* LEFT COLUMN MAIN WRAPPER (Spans 2 cols) */}
+            <div className="lg:col-span-2 space-y-8">
+              
+              {/* --- SIDE-BY-SIDE SPLIT --- */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                
+                {/* 1. HALF WIDTH IMAGE GALLERY */}
+                <div className="h-full w-full">
+                  {allImages.length > 0 ? (
+                    <div className="relative w-full h-full min-h-[500px] rounded-3xl overflow-hidden flex flex-col gap-2 border-2 border-kalahari/20 shadow-xl bg-black">
+                      {/* Main Feature Image (Top) */}
+                      <div className={`relative w-full ${allImages.length > 1 ? 'h-2/3' : 'h-full'}`}>
+                        <Image src={allImages[0]} alt="Featured Safari Image" fill className="object-cover" priority />
+                      </div>
+                      
+                      {/* Secondary Grid (Bottom Split) */}
+                      {allImages.length > 1 && (
+                        <div className="flex gap-2 w-full h-1/3">
+                          <div className="relative h-full w-1/2">
+                            <Image src={allImages[1]} alt="Safari Detail" fill className="object-cover" />
+                          </div>
+                          <div className="relative h-full w-1/2 group">
+                            {allImages[2] ? (
+                              <Image src={allImages[2]} alt="Safari Detail" fill className="object-cover" />
+                            ) : (
+                              <div className="absolute inset-0 bg-black/50 flex items-center justify-center border border-kalahari/20">
+                                 <Compass className="h-10 w-10 text-kalahari/30" />
+                              </div>
+                            )}
+                            {allImages.length > 3 && (
+                              <div className="absolute inset-0 bg-black/60 flex items-center justify-center cursor-pointer hover:bg-black/80 transition-colors backdrop-blur-sm">
+                                <span className="text-white text-sm font-bold flex items-center gap-2"><LayoutGrid className="w-5 h-5"/> +{allImages.length - 3}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                     <div className="w-full h-full min-h-[500px] bg-black/30 rounded-3xl border-2 border-dashed border-kalahari/20 flex items-center justify-center shadow-inner">
+                       <Compass className="h-16 w-16 text-kalahari/30" />
+                     </div>
+                  )}
+                </div>
+
+                {/* 2. HALF WIDTH PACKAGE DETAILS */}
+                <div className="bg-black/20 backdrop-blur-md rounded-3xl border border-kalahari/20 p-6 shadow-lg h-full overflow-y-auto">
+                  
+                  {/* Quick Specs */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-6 border-b border-kalahari/20 mb-6">
+                    {huntData.duration && (
+                      <div className="flex flex-col">
+                        <span className="text-xs font-bold text-kalahari uppercase tracking-widest mb-1">Duration</span>
+                        <span className="text-base font-black flex items-center"><Calendar className="w-4 h-4 mr-2 text-off-white/50" /> {huntData.duration} Days</span>
+                      </div>
+                    )}
+                    {huntData.primarySpecies && (
+                      <div className="flex flex-col">
+                        <span className="text-xs font-bold text-kalahari uppercase tracking-widest mb-1">Target Species</span>
+                        <span className="text-base font-black flex items-center line-clamp-1"><Target className="w-4 h-4 mr-2 text-off-white/50" /> {huntData.primarySpecies}</span>
+                      </div>
+                    )}
+                    <div className="flex flex-col sm:col-span-2">
+                      <span className="text-xs font-bold text-kalahari uppercase tracking-widest mb-1">Location</span>
+                      <span className="text-base font-black flex items-center line-clamp-1"><MapPin className="w-4 h-4 mr-2 text-off-white/50" /> {huntData.province || "South Africa"}</span>
+                    </div>
+                  </div>
+
+                  {/* The Description */}
+                  {huntData.description && (
+                    <div className="mb-8">
+                      <h2 className="text-xl font-black font-headline text-white mb-3">The Experience</h2>
+                      <div className="prose prose-invert prose-sm max-w-none text-off-white/80 font-medium leading-relaxed whitespace-pre-wrap">
+                        {huntData.description}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* What's Included / Excluded */}
+                  {(huntData.includedItems || huntData.excludedItems) && (
+                    <div className="flex flex-col gap-4">
+                      {huntData.includedItems && (
+                        <div className="bg-black/30 p-4 rounded-xl border border-kalahari/10">
+                          <h3 className="text-xs font-black text-kalahari uppercase tracking-widest mb-2 flex items-center gap-2">
+                            <CheckCircle2 className="h-4 w-4" /> Included
+                          </h3>
+                          <div className="text-off-white/70 text-xs font-medium whitespace-pre-wrap leading-relaxed">
+                            {huntData.includedItems}
+                          </div>
+                        </div>
+                      )}
+                      {huntData.excludedItems && (
+                        <div className="bg-black/30 p-4 rounded-xl border border-red-900/20">
+                          <h3 className="text-xs font-black text-red-500 uppercase tracking-widest mb-2 flex items-center gap-2">
+                            <XCircle className="h-4 w-4" /> Excluded
+                          </h3>
+                          <div className="text-off-white/70 text-xs font-medium whitespace-pre-wrap leading-relaxed">
+                            {huntData.excludedItems}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Additional Species */}
+                  {huntData.additionalSpecies && (
+                    <div className="mt-6 pt-6 border-t border-kalahari/20">
+                      <h3 className="text-xs font-black text-white uppercase tracking-widest mb-2 flex items-center gap-2">
+                        <PlusCircle className="h-4 w-4 text-kalahari" /> Additional Species
+                      </h3>
+                      <div className="text-off-white/70 text-xs font-medium whitespace-pre-wrap leading-relaxed">
+                        {huntData.additionalSpecies}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+              </div> {/* END SIDE-BY-SIDE SPLIT */}
+
+              {/* FULL WIDTH CARD 2: Meet The Outfitter */}
+              <div className="bg-gradient-to-br from-black/60 to-black/30 backdrop-blur-md border-2 border-kalahari/30 rounded-3xl p-8 flex flex-col md:flex-row items-center md:items-start justify-between gap-6 shadow-xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+                  <ShieldCheck className="w-40 h-40 text-kalahari" />
+                </div>
+                
+                <div className="flex flex-col md:flex-row items-center md:items-start gap-6 relative z-10 text-center md:text-left">
+                  <div className="relative h-24 w-24 rounded-full border-4 border-kalahari overflow-hidden bg-black shrink-0 shadow-lg">
+                    {outfitterImage ? (
+                      <Image src={outfitterImage} alt={huntData.outfitterName || "Outfitter"} fill className="object-cover" />
+                    ) : (
+                      <User className="h-10 w-10 text-off-white/30 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-kalahari uppercase tracking-widest mb-1">Hosted By</p>
+                    <div className="text-2xl md:text-3xl font-black font-headline text-white flex items-center justify-center md:justify-start mb-2">
+                      {huntData.outfitterName || "Verified Outfitter"} 
+                      <ShieldCheck className="ml-2 h-6 w-6 text-green-500 shrink-0 drop-shadow-md" />
+                    </div>
+                    <p className="text-sm text-off-white/70 font-medium max-w-md">
+                      A premium, verified outfitter operating on the Only-Hunts platform. Book with confidence.
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="shrink-0 relative z-10 w-full md:w-auto">
+                  <Link href={`/outfitters/${huntData.outfitterId}`} className="flex items-center justify-center bg-off-white hover:bg-white text-olive font-black px-6 py-3 rounded-xl transition-all shadow-md w-full md:w-auto">
+                    View Profile <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </div>
+              </div>
+
+              {/* FULL WIDTH CARD 3: More From This Outfitter */}
+              {otherPackages.length > 0 && (
+                <div className="pt-6">
+                  <h3 className="text-xl font-black font-headline text-white mb-6 flex items-center">
+                    More from {huntData.outfitterName || "this Outfitter"}
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {otherPackages.map(pkg => (
+                      <Link href={`/hunts/${pkg.id}`} key={pkg.id} className="group bg-black/30 backdrop-blur-sm border border-kalahari/20 rounded-2xl overflow-hidden hover:border-kalahari/60 transition-colors block">
+                        <div className="relative h-32 w-full bg-black/50">
+                          {(pkg.coverImage || pkg.imageUrl) ? (
+                            <Image src={pkg.coverImage || pkg.imageUrl} alt={pkg.title} fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
+                          ) : (
+                            <Compass className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-8 w-8 text-off-white/20" />
+                          )}
+                        </div>
+                        <div className="p-4">
+                          <h4 className="text-sm font-bold text-white line-clamp-2 mb-2 group-hover:text-kalahari transition-colors">{pkg.title}</h4>
+                          <div className="flex items-center justify-between mt-auto">
+                            <span className="text-[10px] font-bold text-off-white/50 uppercase tracking-widest flex items-center"><Calendar className="w-3 h-3 mr-1" /> {pkg.duration || "?"} D</span>
+                            {(pkg.price || pkg.basePrice) && (
+                              <span className="text-xs font-black text-kalahari flex items-center"><DollarSign className="w-3 h-3" /> {(pkg.price || pkg.basePrice).toLocaleString()}</span>
+                            )}
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+
             </div>
 
-            <div className="p-6 md:p-10">
-              {/* This grid forces a 50/50 side-by-side split on desktop */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
+            {/* RIGHT COLUMN: Standard Checkout Card (Spans 1 col) */}
+            <div className="lg:col-span-1">
+              <div className="space-y-6">
                 
-                {/* Left Side: Outfitter, Price, VIP Deal */}
-                <div className="space-y-8">
-                  <div>
-                    <p className="text-sm font-bold text-olive dark:text-off-white/50 uppercase tracking-widest mb-2">Total Package Price</p>
-                    <div className="flex items-center text-4xl md:text-5xl font-black font-headline text-olive dark:text-off-white">
+                {/* Main Pricing & Booking Card */}
+                <div className="bg-black/60 border-2 border-kalahari/40 rounded-3xl p-6 md:p-8 shadow-2xl relative overflow-hidden backdrop-blur-xl">
+                  
+                  <div className="relative z-10">
+                    <p className="text-xs font-bold text-kalahari uppercase tracking-widest mb-2">Total Package Price</p>
+                    <div className="flex items-center text-4xl md:text-5xl font-black font-headline text-white mb-6 drop-shadow-md">
                       {displayPrice ? (
                         <>
-                          <DollarSign className="h-8 w-8 text-kalahari mr-1" />
+                          <DollarSign className="h-8 w-8 md:h-10 md:w-10 text-kalahari mr-1" />
                           {displayPrice.toLocaleString()}
                         </>
                       ) : (
                         <span className="text-2xl">Contact for Price</span>
                       )}
                     </div>
-                  </div>
 
-                  <div className="pt-8 border-t border-kalahari/10">
-                    <p className="text-xs text-olive dark:text-off-white/60 mb-4 font-bold uppercase tracking-wider">Offered by</p>
-                    <Link href={`/outfitters/${huntData.outfitterId}`} className="flex items-center gap-4 group hover:bg-off-white p-3 -ml-3 rounded-xl transition-colors">
-                      <div className="relative h-14 w-14 rounded-full border-2 border-kalahari/50 overflow-hidden bg-kalahari/20 shrink-0 shadow-sm transition-transform group-hover:scale-105 flex items-center justify-center">
-                        {outfitterImage ? (
-                          <Image src={outfitterImage} alt={huntData.outfitterName || "Outfitter"} fill className="object-cover" />
-                        ) : (
-                          <User className="h-6 w-6 text-olive dark:text-off-white/30" />
-                        )}
+                    {huntData.status === "PENDING" && (
+                      <div className="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-black p-3 rounded-xl mb-6 text-center uppercase tracking-wide shadow-inner">
+                        Pending Admin Approval
                       </div>
-                      <div>
-                        <div className="text-lg font-black font-headline text-olive dark:text-off-white group-hover:text-kalahari transition-colors flex items-center line-clamp-1">
-                          {huntData.outfitterName || "Verified Outfitter"} <ShieldCheck className="ml-1.5 h-4 w-4 text-kalahari shrink-0" />
-                        </div>
-                        <p className="text-sm text-olive dark:text-off-white/60 font-medium group-hover:text-olive dark:text-off-white/80 transition-colors">View full profile</p>
+                    )}
+
+                    <div className="mb-6">
+                      <OfferRedemptionBanner huntId={huntData.id} />
+                    </div>
+
+                    <div className="space-y-4">
+                       <LeadForm
+                        huntId={huntData.id}
+                        outfitterId={huntData.outfitterId}
+                        huntTitle={huntData.title || "Untitled Package"}
+                      />
+                      
+                      <div className="pt-2">
+                        <MessageOutfitterButton 
+                          outfitterId={huntData.outfitterId}
+                          huntId={huntData.id}
+                          huntTitle={huntData.title || "Untitled Package"}
+                          outfitterName={huntData.outfitterName || "Verified Outfitter"}
+                        />
                       </div>
-                    </Link>
-
-                    {/* NEW: MESSAGE BUTTON DROPPED HERE */}
-                    <MessageOutfitterButton 
-                      outfitterId={huntData.outfitterId}
-                      huntId={huntData.id}
-                      huntTitle={huntData.title || "Untitled Package"}
-                      outfitterName={huntData.outfitterName || "Verified Outfitter"}
-                    />
-                  </div>
-
-                  {/* VIP Deal sits right below the Outfitter Info on the left side */}
-                  <div className="pt-2">
-                    <OfferRedemptionBanner huntId={huntData.id} />
+                    </div>
                   </div>
                 </div>
 
-                {/* Right Side: The Form */}
-                <div className="bg-off-white p-6 rounded-2xl border border-kalahari/10 shadow-inner h-full">
-                  <LeadForm
-                    huntId={huntData.id}
-                    outfitterId={huntData.outfitterId}
-                    huntTitle={huntData.title || "Untitled Package"}
-                  />
+                {/* Trust Guarantees */}
+                <div className="bg-black/40 border border-kalahari/20 rounded-2xl p-6 text-center backdrop-blur-sm">
+                  <ShieldCheck className="w-10 h-10 text-kalahari mx-auto mb-3 opacity-80 drop-shadow-sm" />
+                  <p className="text-sm font-black text-white uppercase tracking-widest mb-2">Only-Hunts Guarantee</p>
+                  <p className="text-xs text-off-white/70 font-medium leading-relaxed">Your inquiry is sent directly to the verified outfitter. Secure, transparent booking with zero hidden platform fees.</p>
                 </div>
 
               </div>
             </div>
-          </div>
 
-          {/* Centered Back to Marketplace */}
-          <div className="mt-12 text-center">
-            <Link href="/" className="inline-flex items-center font-bold text-olive dark:text-off-white hover:text-kalahari transition-colors pb-1 border-b-2 border-transparent hover:border-kalahari">
-              <ArrowLeft className="h-5 w-5 mr-2" />
-              Back to Marketplace
-            </Link>
           </div>
         </div>
-
       </div>
-    </>
+    </div>
   );
 }

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { auth, db } from "@/lib/firebase/client";
-import { collection, addDoc, query, where, getDocs } from "firebase/firestore";
+import { collection, addDoc, query, where, getDocs, doc, setDoc, getDoc, increment } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,10 +21,14 @@ export default function LeadForm({ huntId, outfitterId, huntTitle }: LeadFormPro
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
+  
+  // --- NEW: Tracks if they already inquired ---
+  const [existingChatId, setExistingChatId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     name: "",
-    preferredDates: "",
+    arrivalDate: "",
+    departureDate: "", 
     partySize: "1",
     message: "I am interested in booking this package. Please let me know your availability."
   });
@@ -39,6 +43,20 @@ export default function LeadForm({ huntId, outfitterId, huntTitle }: LeadFormPro
         }
 
         try {
+          // 1. DUPLICATE CHECK: Does a chat already exist for this hunt?
+          const chatsRef = collection(db, "chats");
+          const chatQuery = query(
+            chatsRef,
+            where("participants", "array-contains", user.uid),
+            where("huntId", "==", huntId)
+          );
+          const chatSnap = await getDocs(chatQuery);
+          
+          if (!chatSnap.empty) {
+            setExistingChatId(chatSnap.docs[0].id);
+          }
+
+          // 2. Check for VIP offers (Your existing logic)
           const offersRef = collection(db, "offers");
           const q = query(
             offersRef,
@@ -59,7 +77,7 @@ export default function LeadForm({ huntId, outfitterId, huntTitle }: LeadFormPro
             }));
           }
         } catch (err) {
-          console.error("Error checking for VIP offers:", err);
+          console.error("Error fetching form data:", err);
         }
       }
       
@@ -82,9 +100,15 @@ export default function LeadForm({ huntId, outfitterId, huntTitle }: LeadFormPro
       return;
     }
 
+    if (formData.arrivalDate > formData.departureDate) {
+      setError("Departure date cannot be before arrival date.");
+      return;
+    }
+
     setSubmitting(true);
 
     try {
+      // 1. Save to Inquiries Database (For Admin tracking)
       await addDoc(collection(db, "inquiries"), {
         huntId,
         huntTitle,
@@ -92,12 +116,42 @@ export default function LeadForm({ huntId, outfitterId, huntTitle }: LeadFormPro
         hunterId: auth.currentUser.uid,
         hunterEmail: auth.currentUser.email,
         hunterName: formData.name,
-        preferredDates: formData.preferredDates,
+        preferredDates: `${formData.arrivalDate} to ${formData.departureDate}`,
         partySize: Number(formData.partySize),
         message: formData.message,
         status: "NEW", 
         createdAt: new Date().toISOString(),
       });
+
+      // 2. CREATE CHAT & TRIGGER RIFLE NOTIFICATION
+      const chatId = `${auth.currentUser.uid}_${outfitterId}_${huntId}`;
+      const chatRef = doc(db, "chats", chatId);
+      const chatDoc = await getDoc(chatRef);
+      const messagePreview = formData.message.length > 40 ? formData.message.substring(0, 40) + "..." : formData.message;
+
+      if (!chatDoc.exists()) {
+        // First time chatting about this hunt
+        await setDoc(chatRef, {
+          huntId,
+          huntTitle,
+          hunterName: formData.name,
+          outfitterName: "Verified Outfitter", // Outfitter name will update when they reply
+          participants: [auth.currentUser.uid, outfitterId],
+          lastMessage: `New Inquiry: ${messagePreview}`,
+          updatedAt: new Date().toISOString(),
+          unreadCount: { 
+            [outfitterId]: 1, // <--- THIS TRIGGERS THE OUTFITTER'S RIFLE
+            [auth.currentUser.uid]: 0 
+          }
+        });
+      } else {
+        // Chat already exists (fallback safeguard)
+        await setDoc(chatRef, {
+          lastMessage: `New Inquiry: ${messagePreview}`,
+          updatedAt: new Date().toISOString(),
+          [`unreadCount.${outfitterId}`]: increment(1)
+        }, { merge: true });
+      }
 
       setSuccess(true);
     } catch (err: any) {
@@ -111,6 +165,26 @@ export default function LeadForm({ huntId, outfitterId, huntTitle }: LeadFormPro
     return (
       <div className="flex justify-center py-4">
         <Loader2 className="animate-spin h-6 w-6 text-kalahari" />
+      </div>
+    );
+  }
+
+  // --- THE GUARD: Block Duplicates ---
+  if (existingChatId) {
+    return (
+      <div className="bg-blue-50/50 dark:bg-blue-900/10 border-2 border-blue-200 dark:border-blue-800/50 rounded-lg p-5 text-center shadow-sm animate-in fade-in zoom-in duration-300">
+        <div className="mx-auto w-10 h-10 bg-blue-100 dark:bg-blue-900/40 rounded-full flex items-center justify-center mb-3">
+          <MessageSquare className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+        </div>
+        <h3 className="text-lg font-black text-blue-800 dark:text-blue-300 font-headline mb-1">Inquiry Already Sent</h3>
+        <p className="text-blue-700 dark:text-blue-200/70 font-medium text-xs mb-5">
+          You already have an active conversation regarding this package.
+        </p>
+        <Link href={`/messages/${existingChatId}`} className="w-full block">
+          <Button className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white font-black shadow-md transition-all">
+            Continue Conversation
+          </Button>
+        </Link>
       </div>
     );
   }
@@ -155,6 +229,8 @@ export default function LeadForm({ huntId, outfitterId, huntTitle }: LeadFormPro
     );
   }
 
+  const today = new Date().toISOString().split('T')[0];
+
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
       {error && (
@@ -171,30 +247,49 @@ export default function LeadForm({ huntId, outfitterId, huntTitle }: LeadFormPro
           <Input 
             name="name" required value={formData.name} onChange={handleChange} 
             placeholder="John Doe" 
-            className="h-9 border-kalahari/30 focus-visible:ring-kalahari font-medium text-sm" 
+            className="h-9 border-kalahari/30 focus-visible:ring-kalahari font-medium text-sm bg-white dark:bg-stone-900" 
           />
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-[11px] font-bold text-olive dark:text-off-white mb-1 flex items-center gap-1">
-              <CalendarDays className="h-3 w-3 text-kalahari" /> Preferred Dates
+              <CalendarDays className="h-3 w-3 text-kalahari" /> Arrival
             </label>
             <Input 
-              name="preferredDates" required value={formData.preferredDates} onChange={handleChange} 
-              placeholder="e.g. Oct 2026" 
-              className="h-9 border-kalahari/30 focus-visible:ring-kalahari font-medium text-sm" 
+              type="date"
+              name="arrivalDate" 
+              required 
+              min={today}
+              value={formData.arrivalDate} 
+              onChange={handleChange} 
+              className="h-9 border-kalahari/30 focus-visible:ring-kalahari font-medium text-sm cursor-pointer bg-white dark:bg-stone-900" 
             />
           </div>
           <div>
             <label className="text-[11px] font-bold text-olive dark:text-off-white mb-1 flex items-center gap-1">
-              <Users className="h-3 w-3 text-kalahari" /> Hunters
+              <CalendarDays className="h-3 w-3 text-kalahari" /> Departure
             </label>
             <Input 
-              name="partySize" required type="number" min="1" value={formData.partySize} onChange={handleChange} 
-              className="h-9 border-kalahari/30 focus-visible:ring-kalahari font-medium text-sm" 
+              type="date"
+              name="departureDate" 
+              required 
+              min={formData.arrivalDate || today}
+              value={formData.departureDate} 
+              onChange={handleChange} 
+              className="h-9 border-kalahari/30 focus-visible:ring-kalahari font-medium text-sm cursor-pointer bg-white dark:bg-stone-900" 
             />
           </div>
+        </div>
+
+        <div>
+          <label className="text-[11px] font-bold text-olive dark:text-off-white mb-1 flex items-center gap-1">
+            <Users className="h-3 w-3 text-kalahari" /> Total Hunters
+          </label>
+          <Input 
+            name="partySize" required type="number" min="1" value={formData.partySize} onChange={handleChange} 
+            className="h-9 border-kalahari/30 focus-visible:ring-kalahari font-medium text-sm bg-white dark:bg-stone-900" 
+          />
         </div>
 
         <div>
@@ -204,7 +299,7 @@ export default function LeadForm({ huntId, outfitterId, huntTitle }: LeadFormPro
           <Textarea 
             name="message" required value={formData.message} onChange={handleChange} 
             rows={3} 
-            className="border-kalahari/30 focus-visible:ring-kalahari font-medium resize-none text-sm" 
+            className="border-kalahari/30 focus-visible:ring-kalahari font-medium resize-none text-sm bg-white dark:bg-stone-900" 
           />
         </div>
       </div>

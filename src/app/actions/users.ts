@@ -16,6 +16,58 @@ function sanitizeData(doc: any) {
   return { id: doc.id, ...data, createdAt };
 }
 
+// --- UPDATED FUNCTION: Sync User Profile with Legal Audit Trail ---
+export async function syncUserProfile(data: {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+  role: string;
+  termsAccepted?: boolean;
+  termsAcceptedAt?: string;
+  termsVersion?: string;
+}) {
+  try {
+    const userRef = adminDb.collection("users").doc(data.uid);
+    const userSnap = await userRef.get();
+
+    if (!userSnap.exists) {
+      // Create a brand new user in the database with legal logging
+      const newUserData = {
+        email: data.email,
+        name: data.displayName || data.email?.split('@')[0] || 'Unknown',
+        photoURL: data.photoURL || null,
+        role: data.role,
+        status: "ACTIVE", 
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        termsAccepted: data.termsAccepted || false,
+        termsAcceptedAt: data.termsAcceptedAt || null,
+        termsVersion: data.termsVersion || null
+      };
+      await userRef.set(newUserData);
+      
+      await adminAuth.setCustomUserClaims(data.uid, { role: data.role });
+
+      return { success: true, role: data.role };
+    } else {
+      // User already exists, update login time
+      const existingData = userSnap.data();
+      const existingRole = existingData?.role || 'HUNTER';
+
+      await userRef.update({
+        lastLoginAt: new Date().toISOString()
+      });
+
+      return { success: true, role: existingRole };
+    }
+  } catch (error: any) {
+    console.error("Error syncing user profile:", error);
+    return { success: false, error: error.message };
+  }
+}
+// --------------------------------------------------------
+
 export async function getOutfitters() {
   try {
     const snap = await adminDb.collection("users").where("role", "==", "OUTFITTER").get();
@@ -34,15 +86,10 @@ export async function getAdmins() {
   }
 }
 
-// PERMANENT DELETION LOGIC
 export async function deleteAdminAccount(uid: string) {
   try {
-    // 1. Delete from Firebase Authentication (The login)
     await adminAuth.deleteUser(uid);
-
-    // 2. Delete from Firestore (The data)
     await adminDb.collection("users").doc(uid).delete();
-
     revalidatePath("/dashboard/admins");
     return { success: true };
   } catch (error: any) {
@@ -51,7 +98,6 @@ export async function deleteAdminAccount(uid: string) {
   }
 }
 
-// ... (keep createOutfitter and updateOutfitterStatus below this)
 export async function updateOutfitterStatus(id: string, status: "ACTIVE" | "REJECTED", reason?: string) {
   try {
     const updateData: any = { status, statusUpdatedAt: new Date().toISOString() };

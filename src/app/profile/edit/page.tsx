@@ -8,7 +8,7 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { updateProfile } from "firebase/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, ArrowLeft, Camera, User, Save } from "lucide-react";
+import { Loader2, ArrowLeft, Camera, User, Save, ShieldCheck } from "lucide-react";
 
 export default function EditProfilePage() {
   const router = useRouter();
@@ -19,7 +19,7 @@ export default function EditProfilePage() {
   const [role, setRole] = useState<"HUNTER" | "OUTFITTER" | "">("");
   const [formData, setFormData] = useState({
     name: "",
-    email: "", // We keep email read-only for security in this basic version
+    email: "", // Read-only for security
   });
 
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -66,7 +66,6 @@ export default function EditProfilePage() {
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      // Basic validation (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
         setError("Image must be smaller than 5MB.");
         return;
@@ -77,6 +76,7 @@ export default function EditProfilePage() {
     }
   };
 
+  // FINAL CLEAN VERSION WITH HARD REDIRECT
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -90,9 +90,8 @@ export default function EditProfilePage() {
     setSaving(true);
 
     try {
-      let finalImageUrl = imagePreview; // Default to existing if no new file
+      let finalImageUrl = imagePreview; 
 
-      // 1. Upload new image if one was selected
       if (imageFile) {
         const fileExt = imageFile.name.split('.').pop();
         const fileName = `profile_images/${auth.currentUser.uid}_${Date.now()}.${fileExt}`;
@@ -102,24 +101,39 @@ export default function EditProfilePage() {
         finalImageUrl = await getDownloadURL(storageRef);
       }
 
-      // 2. Update Firebase Auth Profile (for quick access)
       await updateProfile(auth.currentUser, {
         displayName: formData.name,
         photoURL: finalImageUrl,
       });
 
-      // 3. Update Firestore Database (for deep app data)
       await updateDoc(doc(db, "users", auth.currentUser.uid), {
         name: formData.name,
         profileImageUrl: finalImageUrl,
         updatedAt: new Date().toISOString(),
       });
 
-      // 4. INSTANT REDIRECT with a success tag in the URL
-      const targetDashboard = role === "OUTFITTER" ? "/outfitter/dashboard" : "/hunter/dashboard";
-      router.push(`${targetDashboard}?success=profile`);
+      if (role === "OUTFITTER") {
+        try {
+          await updateDoc(doc(db, "outfitters", auth.currentUser.uid), {
+            profileImageUrl: finalImageUrl,
+            updatedAt: new Date().toISOString(),
+          });
+        } catch (err) { console.error("Outfitter doc update skipped"); }
+      } else if (role === "HUNTER") {
+        try {
+          await updateDoc(doc(db, "hunters", auth.currentUser.uid), {
+            profileImageUrl: finalImageUrl,
+            updatedAt: new Date().toISOString(),
+          });
+        } catch (err) { console.error("Hunter doc update skipped"); }
+      }
 
-    } catch (err) {
+      const targetDashboard = role === "OUTFITTER" ? "/outfitter/dashboard" : "/hunter/dashboard";
+      
+      // FIX: Force a hard browser reload to bust the Navbar state cache
+      window.location.href = `${targetDashboard}?success=profile`;
+
+    } catch (err: any) {
       console.error("Error saving profile:", err);
       setError("Failed to update profile. Please try again.");
       setSaving(false);
@@ -128,54 +142,58 @@ export default function EditProfilePage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
+      <div className="min-h-screen bg-olive flex items-center justify-center">
         <Loader2 className="animate-spin h-12 w-12 text-kalahari" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-off-white py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-2xl mx-auto space-y-8">
+    <div className="min-h-screen bg-olive py-24 px-4 sm:px-6 lg:px-8 text-off-white font-body relative overflow-hidden">
+      
+      <div 
+        className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-30"
+        style={{ backgroundImage: "url('/armory-bg.jpg')" }}
+      ></div>
+      <div className="absolute top-0 inset-x-0 h-96 bg-gradient-to-b from-black/40 to-transparent pointer-events-none z-0"></div>
+
+      <div className="max-w-3xl mx-auto space-y-8 relative z-10">
         
-        {/* Header */}
-        <div className="flex items-center gap-4 border-b-2 border-kalahari/30 pb-6">
-          <Button 
-            variant="outline" 
-            size="icon" 
-            onClick={() => router.back()}
-            className="h-10 w-10 rounded-full border-kalahari/50 text-olive dark:text-off-white hover:bg-kalahari/20"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-headline font-black text-olive dark:text-off-white tracking-tight">Profile Settings</h1>
-            <p className="text-olive dark:text-off-white/70 font-medium">Update your personal information and photo.</p>
+            <button 
+              type="button"
+              onClick={() => router.back()}
+              className="inline-flex items-center text-sm font-bold text-kalahari hover:text-white transition-colors mb-4 bg-black/20 backdrop-blur-sm px-4 py-2 rounded-full border border-kalahari/20"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" /> Back to Dashboard
+            </button>
+            <h1 className="text-3xl md:text-5xl font-black font-headline tracking-tight text-white drop-shadow-md">
+              Profile Settings
+            </h1>
+            <p className="text-off-white/70 font-medium mt-2">Manage your personal identity on Only-Hunts.</p>
           </div>
         </div>
 
-        {/* Alerts */}
         {error && (
-          <div className="bg-red-50 text-red-800 p-4 rounded-xl border border-red-200 font-bold shadow-sm animate-in fade-in">
+          <div className="bg-red-900/40 text-red-200 p-4 rounded-xl border border-red-500/30 font-bold shadow-sm flex items-center backdrop-blur-md">
             {error}
           </div>
         )}
 
-        {/* The Form */}
-        <form onSubmit={handleSubmit} className="bg-white border-2 border-kalahari/20 rounded-2xl p-6 md:p-10 shadow-sm space-y-8">
+        <form onSubmit={handleSubmit} className="bg-black/20 backdrop-blur-md border border-kalahari/20 rounded-3xl p-6 md:p-10 shadow-2xl space-y-10">
           
-          {/* Profile Picture Upload Section */}
-          <div className="flex flex-col items-center sm:flex-row sm:items-start gap-8 border-b-2 border-kalahari/10 pb-8">
-            <div className="relative group cursor-pointer">
-              <div className="h-32 w-32 rounded-full border-4 border-kalahari/30 overflow-hidden bg-off-white flex items-center justify-center transition-all group-hover:border-kalahari shadow-md">
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-8 border-b border-kalahari/20 pb-10">
+            <div className="relative group cursor-pointer shrink-0">
+              <div className="h-32 w-32 md:h-40 md:w-40 rounded-full border-4 border-kalahari/40 overflow-hidden bg-black/50 flex items-center justify-center transition-all group-hover:border-kalahari shadow-xl">
                 {imagePreview ? (
                   <img src={imagePreview} alt="Profile Preview" className="h-full w-full object-cover" />
                 ) : (
-                  <User className="h-16 w-16 text-olive dark:text-off-white/30" />
+                  <User className="h-16 w-16 text-off-white/30" />
                 )}
               </div>
-              <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <Camera className="h-8 w-8 text-white" />
+              <div className="absolute inset-0 bg-black/60 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm border-4 border-transparent">
+                <Camera className="h-8 w-8 text-white drop-shadow-md" />
               </div>
               <input 
                 type="file" 
@@ -185,15 +203,15 @@ export default function EditProfilePage() {
               />
             </div>
             
-            <div className="text-center sm:text-left pt-2">
-              <h3 className="text-lg font-black font-headline text-olive dark:text-off-white">Profile Picture</h3>
-              <p className="text-sm text-olive dark:text-off-white/60 mt-1 mb-4 max-w-sm">
-                A clear, recognizable photo builds trust {role === "OUTFITTER" ? "with hunters looking to book" : "with outfitters"}.
+            <div className="text-center sm:text-left pt-2 flex-1">
+              <h3 className="text-xl font-black font-headline text-white mb-2">Profile Picture</h3>
+              <p className="text-sm text-off-white/70 font-medium mb-6 max-w-md leading-relaxed">
+                A clear, recognizable photo builds trust and helps {role === "OUTFITTER" ? "hunters feel confident booking with you" : "outfitters verify your identity"}.
               </p>
               <div className="relative inline-block">
-                <Button type="button" variant="outline" className="border-kalahari/50 text-olive dark:text-off-white hover:bg-kalahari/10 font-bold">
-                  Choose Image
-                </Button>
+                <button type="button" className="bg-kalahari/10 hover:bg-kalahari/20 text-kalahari border border-kalahari/30 font-bold px-6 py-2 rounded-xl transition-all">
+                  Upload New Photo
+                </button>
                 <input 
                   type="file" 
                   accept="image/*" 
@@ -204,10 +222,9 @@ export default function EditProfilePage() {
             </div>
           </div>
 
-          {/* Details Section */}
-          <div className="space-y-6">
+          <div className="space-y-8">
             <div>
-              <label className="block text-sm font-bold text-olive dark:text-off-white mb-2">
+              <label className="block text-sm font-bold text-kalahari uppercase tracking-widest mb-3">
                 {role === "OUTFITTER" ? "Company / Outfitter Name" : "Full Name"}
               </label>
               <Input 
@@ -215,34 +232,38 @@ export default function EditProfilePage() {
                 required 
                 value={formData.name} 
                 onChange={handleTextChange} 
-                className="h-14 border-kalahari/40 focus-visible:ring-olive font-bold text-lg bg-off-white" 
+                className="h-14 bg-black/40 border-kalahari/30 text-white focus-visible:ring-kalahari font-bold text-lg rounded-xl shadow-inner placeholder:text-off-white/30" 
+                placeholder="Enter your name"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-olive dark:text-off-white mb-2 flex justify-between">
-                Email Address
-                <span className="text-xs font-normal text-olive dark:text-off-white/50 bg-kalahari/10 px-2 py-0.5 rounded">Read-only</span>
-              </label>
+              <div className="flex justify-between items-center mb-3">
+                <label className="block text-sm font-bold text-kalahari uppercase tracking-widest">
+                  Email Address
+                </label>
+                <span className="text-[10px] font-black text-olive bg-kalahari px-2 py-0.5 rounded uppercase tracking-widest flex items-center shadow-sm">
+                  <ShieldCheck className="w-3 h-3 mr-1" /> Secure
+                </span>
+              </div>
               <Input 
                 name="email" 
                 disabled 
                 value={formData.email} 
-                className="h-14 border-kalahari/20 text-olive dark:text-off-white/50 font-medium bg-gray-50 cursor-not-allowed" 
+                className="h-14 bg-black/20 border-kalahari/10 text-off-white/50 font-medium cursor-not-allowed rounded-xl" 
               />
-              <p className="text-xs text-olive dark:text-off-white/50 mt-2 font-medium">To change your login email, please contact support.</p>
+              <p className="text-xs text-off-white/40 mt-3 font-medium">For security purposes, email addresses cannot be changed directly. Contact support if you need an update.</p>
             </div>
           </div>
 
-          {/* Submit Action */}
-          <div className="pt-6 border-t-2 border-kalahari/10 flex justify-end">
+          <div className="pt-8 border-t border-kalahari/20 flex justify-end">
             <Button 
               type="submit" 
               disabled={saving} 
-              className="w-full sm:w-auto bg-olive hover:bg-olive/90 text-kalahari font-black h-14 px-10 text-lg shadow-md transition-transform hover:-translate-y-0.5 rounded-xl"
+              className="w-full sm:w-auto bg-kalahari text-olive font-black h-14 px-10 text-lg shadow-lg hover:opacity-90 transition-all rounded-xl"
             >
               {saving ? (
-                <><Loader2 className="h-5 w-5 mr-2 animate-spin" /> Saving...</>
+                <><Loader2 className="h-5 w-5 mr-2 animate-spin" /> Updating...</>
               ) : (
                 <><Save className="h-5 w-5 mr-2" /> Save Profile</>
               )}

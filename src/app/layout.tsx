@@ -1,11 +1,21 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
-import { ThemeProvider } from "@/components/ThemeProvider"; // <-- THIS IS THE MAGIC CONNECTION
+import Footer from "@/components/ui/Footer"; // <-- IMPORTED FOOTER
+import WhatsAppWidget from "@/components/ui/WhatsAppWidget"; 
 
 export const metadata: Metadata = {
   title: "Only-Hunts",
   description: "Premium African Hunting Marketplace",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Only-Hunts",
+  },
+  icons: {
+    apple: "/apple-icon.png", 
+  },
 };
 
 export default function RootLayout({
@@ -14,24 +24,23 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      {/* Notice the dark:bg-olive added here so the background actually changes! */}
-      <body className="antialiased min-h-screen bg-off-white text-olive dark:text-off-white dark:bg-olive dark:text-off-white flex flex-col font-body transition-colors duration-300">
+    // Added suppressHydrationWarning to prevent browser extension mismatch errors
+    <html lang="en" className="dark" suppressHydrationWarning>
+      <body className="antialiased min-h-screen bg-olive text-off-white flex flex-col font-body">
         
-        {/* WE MUST WRAP THE APP IN THE THEME PROVIDER */}
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="light"
-          enableSystem={false}
-        >
-          {/* --- GLOBAL SMART HEADER --- */}
-          <Navbar />
+        {/* --- GLOBAL SMART HEADER --- */}
+        <Navbar />
 
-          {/* --- MAIN PAGE CONTENT --- */}
-          <main className="flex-grow flex flex-col">
-            {children}
-          </main>
-        </ThemeProvider>
+        {/* --- MAIN PAGE CONTENT --- */}
+        <main className="flex-grow flex flex-col">
+          {children}
+        </main>
+
+        {/* --- GLOBAL FOOTER --- */}
+        <Footer />
+
+        {/* --- GLOBAL FLOATING WIDGETS --- */}
+        <WhatsAppWidget />
 
       </body>
     </html>

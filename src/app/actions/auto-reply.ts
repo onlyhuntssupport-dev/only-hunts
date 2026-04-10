@@ -1,11 +1,7 @@
 "use server";
 
 import { adminDb } from "@/lib/firebase/admin";
-import { Resend } from "resend";
-
-// Safely grab the key, or default to a dummy string to prevent crashes
-const resendApiKey = process.env.RESEND_API_KEY || "dummy_key";
-const resend = new Resend(resendApiKey);
+import { sendPlatformEmail } from "@/lib/email/sender"; // NEW CENTRAL UTILITY
 
 export async function triggerOutfitterAutoReply(
   hunterId: string,
@@ -26,23 +22,14 @@ export async function triggerOutfitterAutoReply(
       createdAt: new Date().toISOString(),
     });
 
-    // 2. Email Notification (Mocks if using a dummy key)
-    if (resendApiKey === "dummy_key" || !resendApiKey.startsWith("re_")) {
-      console.log("🛠️ [DEV MODE] Resend API key missing or invalid. Email mocked successfully.");
-      console.log(`✉️ Would have sent to: ${hunterEmail}\nSubject: We received your inquiry for ${huntTitle}!`);
-      return { success: true, mocked: true };
-    }
-
-    // 3. Live Email Execution
-    const { data, error } = await resend.emails.send({
-      from: "Only-Hunts <notifications@yourdomain.com>", // Update this later
-      to: [hunterEmail],
+    // 2. Live Email Execution via Central Utility
+    const emailResult = await sendPlatformEmail({
+      to: hunterEmail,
       subject: `We received your inquiry for ${huntTitle}!`,
       text: messageBodyText,
     });
 
-    if (error) {
-      console.error("Resend error:", error);
+    if (!emailResult.success) {
       return { success: false, error: "Email failed to send" };
     }
 

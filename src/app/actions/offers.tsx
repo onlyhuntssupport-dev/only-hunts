@@ -1,11 +1,8 @@
 'use server';
 
 import { adminDb } from '@/lib/firebase/admin';
-import { Resend } from 'resend';
+import { sendPlatformEmail } from '@/lib/email/sender'; // NEW CENTRAL UTILITY
 import OfferNotificationEmail from '@/emails/OfferNotificationEmail';
-
-// Initialize Resend safely with a dummy key so it doesn't crash the app during development
-const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy_key_123');
 
 export async function sendBlindOffers(outfitterId: string, huntId: string, huntTitle: string, message: string) {
   try {
@@ -30,14 +27,14 @@ export async function sendBlindOffers(outfitterId: string, huntId: string, huntT
     const batch = adminDb.batch();
     const emailPromises: Promise<any>[] = [];
 
-    // Base URL for the email button (Use localhost in dev, or your real domain in prod)
+    // Base URL for the email button
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:9003';
     const dashboardLink = `${baseUrl}/hunter/dashboard`;
 
     for (const docSnap of wishlistsSnap.docs) {
       const hunterId = docSnap.id;
       
-      // A. Create a new exclusive offer document for this specific hunter
+      // A. Create a new exclusive offer document
       const offerRef = adminDb.collection('offers').doc();
       batch.set(offerRef, {
         outfitterId,
@@ -56,12 +53,10 @@ export async function sendBlindOffers(outfitterId: string, huntId: string, huntT
         const hunterEmail = hunterData?.email;
         const hunterName = hunterData?.name || "Hunter";
 
-        // C. Queue the Email ONLY if a real API key exists
-        const apiKey = process.env.RESEND_API_KEY;
-        if (hunterEmail && apiKey && apiKey !== 're_dummy_key_123') {
+        // C. Queue the Email via Central Utility
+        if (hunterEmail) {
           emailPromises.push(
-            resend.emails.send({
-              from: 'Only-Hunts <notifications@only-hunts.com>',
+            sendPlatformEmail({
               to: hunterEmail,
               subject: `VIP Offer: ${outfitterName} sent you a deal!`,
               react: (

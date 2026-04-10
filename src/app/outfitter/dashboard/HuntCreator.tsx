@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { storage } from "@/lib/firebase/client";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { createHuntListing } from "@/app/actions/hunts";
+// NEW IMPORT: Universal storage helper
+import { uploadWithCompression } from "@/lib/firebase/storageHelper";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2, UploadCloud, X } from "lucide-react";
@@ -60,14 +60,14 @@ export default function HuntCreator({ outfitterId, outfitterName }: HuntCreatorP
     setError("");
 
     try {
-      // 1. Upload all images to Firebase Storage
+      // 1. Compress and Upload all images to Firebase Storage
       const uploadedUrls = await Promise.all(
         images.map(async (file) => {
           const fileExt = file.name.split('.').pop();
           const fileName = `hunts/${outfitterId}_${Date.now()}_${Math.random().toString(36).slice(2)}.${fileExt}`;
-          const storageRef = ref(storage, fileName);
-          await uploadBytes(storageRef, file);
-          return await getDownloadURL(storageRef);
+          
+          // NEW CODE: Using the universal compression helper
+          return await uploadWithCompression(file, fileName);
         })
       );
 

@@ -1,6 +1,12 @@
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
+  // --- ADDED: Whitelist Cloud Workstation URLs to allow Hot Module Replacement (HMR)
+  allowedDevOrigins: [
+    "9003-firebase-studio-1771862059110.cluster-lu4mup47g5gm4rtyvhzpwbfadi.cloudworkstations.dev",
+    "*.cloudworkstations.dev"
+  ],
+  
   /* config options here */
   typescript: {
     ignoreBuildErrors: true,

@@ -4,24 +4,24 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { auth, db, storage } from "@/lib/firebase/client";
+import { auth, db } from "@/lib/firebase/client";
+import { uploadWithCompression } from "@/lib/firebase/storageHelper";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, ArrowRight, ShieldCheck, FileText, Target, MapPin } from "lucide-react";
+import { Loader2, ArrowRight, ShieldCheck, FileText, Target, MapPin, Award } from "lucide-react";
 import Link from "next/link";
 
 export default function OutfitterRegistration() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [step, setStep] = useState(1); // 1: Form, 2: Success
+  const [step, setStep] = useState(1); 
   
-  // NOTE: Phone number removed to enforce the on-platform Walled Garden rule
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     location: "",
+    affiliations: "", // NEW: Industry Affiliations
     password: "",
   });
   const [permitFile, setPermitFile] = useState<File | null>(null);
@@ -54,31 +54,32 @@ export default function OutfitterRegistration() {
       // 2. Upload Permit to Firebase Storage
       const fileExtension = permitFile.name.split('.').pop();
       const fileName = `outfitter_permits/${uid}_${Date.now()}.${fileExtension}`;
-      const storageRef = ref(storage, fileName);
-      await uploadBytes(storageRef, permitFile);
-      const permitUrl = await getDownloadURL(storageRef);
+      const permitUrl = await uploadWithCompression(permitFile, fileName);
 
-      // 3. Create Outfitter Application Data (For Admin Review)
+      // 3. Create Outfitter Application Data (Strictly PENDING)
       await setDoc(doc(db, "outfitters", uid), {
         name: formData.name,
         email: formData.email,
         location: formData.location,
+        affiliations: formData.affiliations, // NEW: Saved to profile
         permitUrl: permitUrl,
-        status: "PENDING", // Crucial: Locks them out of the marketplace until admin approval
+        status: "PENDING",
+        tier: "none", // No trial granted yet
+        isAdminOverride: false,
         totalListings: 0,
         createdAt: new Date().toISOString(),
       });
 
-      // 4. AUTOMATION: Create Master User Profile with OUTFITTER Role
-      // This ensures the Navbar, Settings page, and system instantly recognize them
+      // 4. Create Master User Profile with OUTFITTER Role
       await setDoc(doc(db, "users", uid), {
         name: formData.name,
         email: formData.email,
         role: "OUTFITTER",
+        permitUrl: permitUrl, 
         createdAt: new Date().toISOString(),
       });
 
-      // 5. Move to Success Screen
+      // 5. Move to Success Screen (Locked Out)
       setStep(2);
     } catch (err: any) {
       console.error("Registration Error:", err);
@@ -91,19 +92,27 @@ export default function OutfitterRegistration() {
   if (step === 2) {
     return (
       <div className="min-h-screen bg-stone-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-        <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-          <div className="mx-auto flex items-center justify-center h-20 w-20 rounded-full bg-emerald-100 mb-6">
+        <div className="sm:mx-auto sm:w-full sm:max-w-xl text-center">
+          <div className="mx-auto flex items-center justify-center h-20 w-20 rounded-full bg-emerald-100 mb-6 shadow-sm border-4 border-emerald-50">
             <ShieldCheck className="h-10 w-10 text-emerald-600" />
           </div>
-          <h2 className="text-3xl font-black text-stone-900 tracking-tight">Application Submitted</h2>
-          <p className="mt-4 text-stone-500 font-medium">
-            Thank you for applying to join Only-Hunts. Our admin team is reviewing your permit and business details. 
-          </p>
-          <div className="mt-8 bg-white p-6 rounded-xl border border-stone-200 shadow-sm">
-            <p className="text-sm text-stone-600 mb-6">
-              You will receive an email once your account is approved. Until then, your dashboard access is restricted.
+          <h2 className="text-4xl font-black text-stone-900 tracking-tight mb-2">Application Received</h2>
+          
+          <div className="mt-8 bg-white p-8 rounded-2xl border-2 border-stone-200 shadow-xl relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-amber-500"></div>
+            
+            <p className="text-stone-700 leading-relaxed font-medium mb-6 text-left">
+              To protect our hunting community, Only-Hunts operates a 100% verified network. Dashboard access is temporarily restricted while our administrative team verifies your professional outfitter permit and industry affiliations (e.g., PHASA, CHASA, WRSA, etc.).
             </p>
-            <Button onClick={() => router.push("/")} className="w-full bg-amber-800 hover:bg-amber-900 text-white h-12 text-lg">
+            
+            <div className="bg-amber-50 rounded-xl p-4 mb-8 border border-amber-200 text-left flex gap-3 items-start">
+              <ShieldCheck className="h-6 w-6 text-amber-700 shrink-0 mt-0.5" />
+              <p className="text-sm text-amber-900 font-bold">
+                You will receive an email the moment your account is approved and your 14-day free trial begins.
+              </p>
+            </div>
+
+            <Button onClick={() => router.push("/")} className="w-full bg-stone-900 hover:bg-stone-800 text-white h-14 text-lg font-black rounded-xl transition-all">
               Return to Homepage
             </Button>
           </div>
@@ -114,7 +123,6 @@ export default function OutfitterRegistration() {
 
   return (
     <div className="min-h-screen bg-stone-50 flex">
-      {/* Left side - Information */}
       <div className="hidden lg:flex lg:w-1/2 bg-stone-900 flex-col justify-between p-16 text-white relative overflow-hidden">
         <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1601255866032-68310118eb3a?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center opacity-20"></div>
         <div className="relative z-10">
@@ -138,7 +146,6 @@ export default function OutfitterRegistration() {
         </div>
       </div>
 
-      {/* Right side - Form */}
       <div className="flex-1 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-20 xl:px-24 bg-white relative">
         <div className="mx-auto w-full max-w-sm lg:max-w-md">
           <div className="lg:hidden mb-8">
@@ -148,7 +155,7 @@ export default function OutfitterRegistration() {
           <h2 className="text-3xl font-black text-stone-900 tracking-tight">Apply as an Outfitter</h2>
           <p className="mt-2 text-sm text-stone-500 font-bold uppercase tracking-widest">Partner Network</p>
 
-          <form onSubmit={handleSubmit} className="mt-10 space-y-6">
+          <form onSubmit={handleSubmit} className="mt-8 space-y-5">
             {error && (
               <div className="bg-red-50 text-red-700 p-4 rounded-md text-sm font-bold border border-red-200">
                 {error}
@@ -174,6 +181,18 @@ export default function OutfitterRegistration() {
                 </div>
               </div>
 
+              {/* NEW: Industry Affiliations */}
+              <div>
+                <label className="block text-sm font-bold text-stone-700 mb-1 flex items-center gap-2">
+                  Industry Affiliations <span className="text-xs font-medium text-stone-400 uppercase tracking-wider">(Optional)</span>
+                </label>
+                <div className="relative">
+                  <Award className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-stone-400" />
+                  <Input name="affiliations" value={formData.affiliations} onChange={handleChange} placeholder="e.g. PHASA, CHASA, WRSA" className="h-12 pl-10" disabled={loading} />
+                </div>
+                <p className="text-[10px] text-stone-500 mt-1 font-medium">Helps expedite your verification process.</p>
+              </div>
+
               <div>
                 <label className="block text-sm font-bold text-stone-700 mb-1">Password</label>
                 <Input type="password" name="password" required minLength={6} value={formData.password} onChange={handleChange} placeholder="Create a strong password" className="h-12" disabled={loading} />
@@ -197,13 +216,13 @@ export default function OutfitterRegistration() {
               </div>
             </div>
 
-            <Button type="submit" disabled={loading} className="w-full h-14 text-lg bg-amber-800 hover:bg-amber-900 text-white gap-2">
+            <Button type="submit" disabled={loading} className="w-full h-14 text-lg bg-amber-800 hover:bg-amber-900 text-white gap-2 font-black mt-6">
               {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : (
                 <>Submit Application <ArrowRight className="h-5 w-5" /></>
               )}
             </Button>
             
-            <p className="text-center text-sm text-stone-500 font-medium">
+            <p className="text-center text-sm text-stone-500 font-medium mt-4">
               Already have an account? <Link href="/login" className="text-amber-800 font-bold hover:underline">Sign in here</Link>
             </p>
           </form>

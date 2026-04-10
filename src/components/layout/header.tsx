@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu, LogIn, Heart, LayoutDashboard, LogOut, Settings, Shield } from 'lucide-react';
+import { Menu, LogIn, Heart, LayoutDashboard, LogOut, Settings, Shield, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -16,9 +16,8 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Logo } from '@/components/icons';
 import { useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
-import { Skeleton } from '../ui/skeleton';
 import { logOut } from '@/lib/firebase/auth';
+import NotificationBell from '@/components/ui/NotificationBell';
 
 interface NavLink {
   id: string;
@@ -37,7 +36,6 @@ export function Header() {
   const { toast } = useToast();
   const pathname = usePathname();
 
-  // --- THE DETECTIVE: Are we on a dashboard? ---
   const isDashboard = pathname?.includes('/dashboard');
 
   const handleSignOut = async () => {
@@ -58,21 +56,15 @@ export function Header() {
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 max-w-7xl items-center">
         
-        {/* DESKTOP VIEW */}
         <div className="mr-4 hidden md:flex">
           <Link href="/" className="mr-6 flex items-center space-x-2">
             <Logo />
           </Link>
           
-          {/* Only show the marketplace links if we are NOT on a dashboard */}
           {!isDashboard && (
             <nav className="flex items-center gap-6 text-sm">
               {navLinks.map((link) => (
-                <Link
-                  key={link.id}
-                  href={link.href}
-                  className="transition-colors hover:text-foreground/80 text-foreground/60"
-                >
+                <Link key={link.id} href={link.href} className="transition-colors hover:text-foreground/80 text-foreground/60">
                   {link.label}
                 </Link>
               ))}
@@ -80,7 +72,6 @@ export function Header() {
           )}
         </div>
 
-        {/* MOBILE VIEW */}
         <div className="md:hidden">
           <Sheet>
             <SheetTrigger asChild>
@@ -94,16 +85,10 @@ export function Header() {
                 <Link href="/" className="mb-4 flex items-center">
                   <Logo />
                 </Link>
-                
-                {/* Only show the marketplace links in mobile menu if we are NOT on a dashboard */}
                 {!isDashboard && (
                   <div className="flex flex-col gap-4 py-4">
                     {navLinks.map((link) => (
-                      <Link
-                        key={link.id}
-                        href={link.href}
-                        className="text-foreground"
-                      >
+                      <Link key={link.id} href={link.href} className="text-foreground">
                         {link.label}
                       </Link>
                     ))}
@@ -114,56 +99,60 @@ export function Header() {
           </Sheet>
         </div>
         
-        {/* RIGHT SIDE: User Profile / Login */}
         <div className="flex flex-1 items-center justify-end space-x-2">
           {loading ? (
-            <Skeleton className="h-8 w-8 rounded-full" />
+            <div className="h-8 w-8 rounded-full bg-stone-200 dark:bg-stone-800 animate-pulse" />
           ) : user ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                   <Avatar className="h-8 w-8">
-                      <AvatarImage src={user.photoURL || undefined} alt={user.displayName || 'User'} />
-                      <AvatarFallback>{getInitials(user.displayName)}</AvatarFallback>
-                    </Avatar>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="end" forceMount>
-                <DropdownMenuLabel className="font-normal">
-                  <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{user.displayName || 'User'}</p>
-                    <p className="text-xs leading-none text-muted-foreground">
-                      {user.email}
-                    </p>
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                
-                {user.role === 'HUNTER' && (
-                    <DropdownMenuItem asChild>
-                        <Link href="/hunter/dashboard" className='w-full flex items-center gap-2'><Heart /> My Wishlist</Link>
-                    </DropdownMenuItem>
-                )}
-                {user.role === 'OUTFITTER' && (
-                    <DropdownMenuItem asChild>
-                        <Link href="/outfitter/dashboard" className='w-full flex items-center gap-2'><LayoutDashboard /> Outfitter Hub</Link>
-                    </DropdownMenuItem>
-                )}
-                {user.role === 'ADMIN' && (
-                    <DropdownMenuItem asChild>
-                        <Link href="/admin" className='w-full flex items-center gap-2'><Shield /> Admin Panel</Link>
-                    </DropdownMenuItem>
-                )}
-                
-                <DropdownMenuItem>
-                  <Settings className="mr-2 h-4 w-4" /> Profile
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleSignOut} className="flex items-center gap-2 text-red-600 focus:text-red-600">
-                  <LogOut className="h-4 w-4" /> Log out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="flex items-center gap-2 sm:gap-4">
+              <NotificationBell />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="relative h-8 w-8 rounded-full bg-kalahari/10 text-kalahari font-bold hover:bg-kalahari/20">
+                    {getInitials(user.displayName)}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56" align="end" forceMount>
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium leading-none">{user.displayName || 'User'}</p>
+                      <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  
+                  {user.role === 'HUNTER' && (
+                      <DropdownMenuItem asChild>
+                          <Link href="/hunter/dashboard" className='w-full flex items-center gap-2'><Heart className="h-4 w-4" /> My Wishlist</Link>
+                      </DropdownMenuItem>
+                  )}
+                  {user.role === 'OUTFITTER' && (
+                      <>
+                        <DropdownMenuItem asChild>
+                            <Link href="/outfitter/dashboard" className='w-full flex items-center gap-2'><LayoutDashboard className="h-4 w-4" /> Outfitter Hub</Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                            <Link href="/outfitter/dashboard/billing" className='w-full flex items-center gap-2 text-olive dark:text-off-white'>
+                              <CreditCard className="h-4 w-4 text-kalahari" /> Billing & Account
+                            </Link>
+                        </DropdownMenuItem>
+                      </>
+                  )}
+                  {user.role === 'ADMIN' && (
+                      <DropdownMenuItem asChild>
+                          <Link href="/admin" className='w-full flex items-center gap-2'><Shield className="h-4 w-4" /> Admin Panel</Link>
+                      </DropdownMenuItem>
+                  )}
+                  
+                  <DropdownMenuItem>
+                    <Settings className="mr-2 h-4 w-4" /> Profile
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleSignOut} className="flex items-center gap-2 text-red-600 focus:text-red-600">
+                    <LogOut className="h-4 w-4" /> Log out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           ) : (
             <div className="hidden sm:flex items-center gap-2">
               <Button variant="ghost" asChild>
@@ -174,13 +163,6 @@ export function Header() {
               </Button>
             </div>
           )}
-           <div className="sm:hidden">
-            {!user && !loading && (
-              <Button variant="ghost" size="icon" asChild>
-                <Link href="/login"><LogIn className="h-5 w-5" /></Link>
-              </Button>
-            )}
-           </div>
         </div>
       </div>
     </header>

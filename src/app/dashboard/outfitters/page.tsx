@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-// UPDATED IMPORT PATH:
 import { getOutfitters, updateOutfitterStatus, createOutfitter, deleteAdminAccount } from "@/app/actions/outfitters";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { storage } from "@/lib/firebase/client"; 
+// NEW IMPORT: Universal storage helper
+import { uploadWithCompression } from "@/lib/firebase/storageHelper"; 
 import { Ban, CheckCircle, Clock, Loader2, UserPlus, User, X, FileText, ExternalLink, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -121,9 +120,8 @@ export default function OutfittersPage() {
       const fileExtension = file.name.split('.').pop();
       const fileName = `outfitter_permits/${Date.now()}_${formData.get("name")?.toString().replace(/\s+/g, '_')}.${fileExtension}`;
       
-      const storageRef = ref(storage, fileName);
-      const snapshot = await uploadBytes(storageRef, file);
-      const downloadUrl = await getDownloadURL(snapshot.ref);
+      // NEW CODE: Using the universal compression helper
+      const downloadUrl = await uploadWithCompression(file, fileName);
 
       formData.append("permitUrl", downloadUrl);
 
