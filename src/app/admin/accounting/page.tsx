@@ -17,7 +17,8 @@ export default function AdminAccountingDashboard() {
       setLoading(true);
       const fRes = await getFinancialLedger();
       if (fRes && fRes.success) {
-        setTransactions(fRes.data);
+        // OVERRIDE: Added fallback array to ensure undefined is never passed to state
+        setTransactions(fRes.data || []);
         setFinancialStats(fRes.stats);
       }
       setLoading(false);

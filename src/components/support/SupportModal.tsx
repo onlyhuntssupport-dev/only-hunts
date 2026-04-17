@@ -36,7 +36,6 @@ export default function SupportModal({ variant = "sidebar" }: SupportModalProps)
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   
-  // NEW: Local error state instead of invisible Toasts
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
@@ -48,7 +47,7 @@ export default function SupportModal({ variant = "sidebar" }: SupportModalProps)
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "unset";
-      setErrorMsg(null); // Clear errors when closed
+      setErrorMsg(null); 
     }
     return () => {
       document.body.style.overflow = "unset";
@@ -56,7 +55,7 @@ export default function SupportModal({ variant = "sidebar" }: SupportModalProps)
   }, [isOpen]);
 
   const handleSubmit = async () => {
-    setErrorMsg(null); // Reset errors on new attempt
+    setErrorMsg(null); 
 
     if (!category) {
       setErrorMsg("Please select a category above.");
@@ -82,7 +81,7 @@ export default function SupportModal({ variant = "sidebar" }: SupportModalProps)
       await addDoc(collection(db, "supportTickets"), {
         userId: currentUser.uid,
         userEmail: currentUser.email || userData.email || "No Email",
-        userName: userData.name || userData.companyName || "Unknown User",
+        userName: userData.displayName || userData.name || userData.companyName || "Unknown User",
         userRole: userData.role || "UNKNOWN",
         category: category,
         message: message,
@@ -182,7 +181,6 @@ export default function SupportModal({ variant = "sidebar" }: SupportModalProps)
                 />
               </div>
 
-              {/* NEW: Explicit Inline Error Message UI */}
               {errorMsg && (
                 <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/50 rounded-xl flex items-center gap-2 text-red-600 dark:text-red-400 text-sm font-bold animate-in fade-in slide-in-from-bottom-2">
                   <AlertTriangle className="h-4 w-4 shrink-0" />

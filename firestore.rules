@@ -1,0 +1,157 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return isAuthenticated() && 
+             userDoc != null && 
+             'role' in userDoc.data && 
+             (userDoc.data.role == 'ADMIN' || userDoc.data.role == 'SUPER_ADMIN' || userDoc.data.role == 'SUPERADMIN');
+    }
+
+    function isParticipantInChat(chatId) {
+      let chatDoc = get(/databases/$(database)/documents/chats/$(chatId));
+      return chatDoc != null && 
+             'participants' in chatDoc.data && 
+             chatDoc.data.participants.hasAny([request.auth.uid]);
+    }
+
+    match /outfitters/{userId} {
+      allow read: if true;
+      allow write: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      
+      match /private/contact {
+        allow read, write: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      }
+      
+      match /documents/{documentId} {
+        allow read: if true; 
+        allow write: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      }
+    }
+    
+    match /hunts/{huntId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && (
+        ('outfitterId' in request.resource.data && request.resource.data.outfitterId == request.auth.uid) || isAdmin()
+      );
+      allow update, delete: if isAuthenticated() && (
+        ('outfitterId' in resource.data && resource.data.outfitterId == request.auth.uid) || isAdmin()
+      );
+    }
+
+    match /pricing_matrices/{matrixId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && (
+        ('outfitterId' in request.resource.data && request.resource.data.outfitterId == request.auth.uid) || isAdmin()
+      );
+      allow update, delete: if isAuthenticated() && (
+        ('outfitterId' in resource.data && resource.data.outfitterId == request.auth.uid) || isAdmin()
+      );
+    }
+
+    match /chats/{docId} {
+      allow read, update, delete: if isAuthenticated() && (
+        ('participants' in resource.data && resource.data.participants.hasAny([request.auth.uid])) || isAdmin()
+      );
+      allow create: if isAuthenticated() && (
+        ('participants' in request.resource.data && request.resource.data.participants.hasAny([request.auth.uid])) || isAdmin()
+      );
+
+      match /messages/{messageId} {
+        allow read, write: if isAuthenticated() && (isParticipantInChat(docId) || isAdmin());
+      }
+    }
+
+    match /inquiries/{docId} {
+      allow read, update, delete: if isAuthenticated() && (
+        ('outfitterId' in resource.data && resource.data.outfitterId == request.auth.uid) || 
+        ('hunterId' in resource.data && resource.data.hunterId == request.auth.uid) || 
+        isAdmin()
+      );
+      allow create: if isAuthenticated() && (
+        ('outfitterId' in request.resource.data && request.resource.data.outfitterId == request.auth.uid) || 
+        ('hunterId' in request.resource.data && request.resource.data.hunterId == request.auth.uid) || 
+        isAdmin()
+      );
+    }
+
+    match /quote_requests/{docId} {
+      allow read, update, delete: if isAuthenticated() && (
+        ('outfitterId' in resource.data && resource.data.outfitterId == request.auth.uid) || 
+        ('hunterId' in resource.data && resource.data.hunterId == request.auth.uid) || 
+        isAdmin()
+      );
+      allow create: if isAuthenticated() && (
+        ('outfitterId' in request.resource.data && request.resource.data.outfitterId == request.auth.uid) || 
+        ('hunterId' in request.resource.data && request.resource.data.hunterId == request.auth.uid) || 
+        isAdmin()
+      );
+    }
+
+    match /quotes/{docId} {
+      allow read, update, delete: if isAuthenticated() && (
+        ('outfitterId' in resource.data && resource.data.outfitterId == request.auth.uid) || 
+        ('hunterId' in resource.data && resource.data.hunterId == request.auth.uid) || 
+        isAdmin()
+      );
+      allow create: if isAuthenticated() && (
+        ('outfitterId' in request.resource.data && request.resource.data.outfitterId == request.auth.uid) || 
+        ('hunterId' in request.resource.data && request.resource.data.hunterId == request.auth.uid) || 
+        isAdmin()
+      );
+    }
+
+    match /offers/{docId} {
+      allow read, update, delete: if isAuthenticated() && (
+        ('outfitterId' in resource.data && resource.data.outfitterId == request.auth.uid) || 
+        ('hunterId' in resource.data && resource.data.hunterId == request.auth.uid) || 
+        isAdmin()
+      );
+      allow create: if isAuthenticated() && (
+        ('outfitterId' in request.resource.data && request.resource.data.outfitterId == request.auth.uid) || 
+        ('hunterId' in request.resource.data && request.resource.data.hunterId == request.auth.uid) || 
+        isAdmin()
+      );
+    }
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == userId; 
+      allow update, delete: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+    }
+    
+    match /notifications/{docId} {
+      allow read, update, delete: if isAuthenticated() && (
+        ('userId' in resource.data && resource.data.userId == request.auth.uid) || isAdmin()
+      );
+      allow create: if isAuthenticated() && (
+        ('userId' in request.resource.data && request.resource.data.userId == request.auth.uid) || isAdmin()
+      );
+    }
+    
+    match /wishlists/{docId} {
+      allow read, update, delete: if isAuthenticated() && (
+        ('userId' in resource.data && resource.data.userId == request.auth.uid) || isAdmin()
+      );
+      allow create: if isAuthenticated() && (
+        ('userId' in request.resource.data && request.resource.data.userId == request.auth.uid) || isAdmin()
+      );
+    }
+
+    match /supportTickets/{docId} {
+      allow create: if true; 
+      allow read, update, delete: if isAuthenticated();
+    }
+
+    match /analytics/{docId} {
+      allow write: if true; 
+      allow read: if isAuthenticated();
+    }
+  }
+}

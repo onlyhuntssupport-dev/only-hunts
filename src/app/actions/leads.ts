@@ -79,8 +79,8 @@ export async function getOutfitterLeads(outfitterId: string) {
       };
     }));
 
-    // Sort the leads in memory (newest first) instead of making Firebase do it
-    leads.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    // OVERRIDE: Added strict 'any' typing to array parameters so TS doesn't panic over createdAt
+    leads.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     return { success: true, data: leads };
   } catch (error: any) {

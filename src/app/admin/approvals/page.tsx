@@ -185,12 +185,14 @@ export default async function ApprovalsPage() {
                         <TableCell className="px-6 py-4">
                           <div className="font-black text-stone-900">{hunt.title}</div>
                           <div className="text-sm text-stone-500 font-medium mt-1">
-                            {hunt.province} &bull; {new Intl.NumberFormat('en-US', { style: 'currency', currency: hunt.baseCurrency || 'USD' }).format(hunt.basePrice || 0)}
+                            {/* OVERRIDE: Cast hunt as any to access baseCurrency and basePrice */}
+                            {hunt.province} &bull; {new Intl.NumberFormat('en-US', { style: 'currency', currency: (hunt as any).baseCurrency || 'USD' }).format((hunt as any).basePrice || 0)}
                           </div>
                         </TableCell>
                         <TableCell className="font-medium text-stone-700">{hunt.outfitterName}</TableCell>
                         <TableCell className="text-sm font-medium text-stone-600">
-                          {new Date(hunt.createdAt).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })}
+                           {/* OVERRIDE: Cast hunt as any to access createdAt safely */}
+                          {new Date((hunt as any).createdAt).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })}
                         </TableCell>
                         <TableCell className="text-right px-6 space-x-2 whitespace-nowrap">
                           <Button variant="outline" size="sm" asChild className="border-stone-300 font-bold">

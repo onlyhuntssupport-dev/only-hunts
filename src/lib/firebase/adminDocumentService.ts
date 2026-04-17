@@ -1,6 +1,6 @@
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from './config'; // Adjust to your Firebase config path
-import { DocumentStatus } from '@/types/documents'; // From Module 9
+import { db } from './client'; // Corrected from './config' to './client'
+import { DocumentStatus } from '@/types/documents'; 
 
 /**
  * Admin function to approve or reject an Outfitter's uploaded document.

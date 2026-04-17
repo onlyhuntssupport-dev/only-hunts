@@ -4,12 +4,13 @@ import { useEffect, useState } from "react";
 import { auth } from "@/lib/firebase/client";
 import { getOutfitterStats } from "@/app/actions/outfitter-dashboard";
 import HuntCreator from "@/components/dashboard/HuntCreator";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
 
 export default function CreateHuntPage() {
     const [loading, setLoading] = useState(true);
     const [outfitterId, setOutfitterId] = useState<string | null>(null);
     const [outfitterName, setOutfitterName] = useState("Unnamed Outfitter");
+    const [outfitterStatus, setOutfitterStatus] = useState<string>("PENDING"); // Default to safest option
 
     useEffect(() => {
         const unsubscribe = auth.onAuthStateChanged(async (user) => {
@@ -19,6 +20,7 @@ export default function CreateHuntPage() {
                     const res = await getOutfitterStats(user.uid);
                     if (res && res.success && res.data) {
                         setOutfitterName(res.data.name);
+                        setOutfitterStatus(res.data.status || "PENDING");
                     }
                 } catch (error) {
                     console.error("Failed to fetch outfitter stats:", error);
@@ -42,13 +44,29 @@ export default function CreateHuntPage() {
 
     return (
         <div className="container mx-auto max-w-4xl py-8">
-             <div className="mb-8">
+            <div className="mb-8">
                 <h1 className="text-3xl font-bold font-headline text-stone-900">Create a New Hunt</h1>
                 <p className="text-stone-500 mt-2">
                     Fill out the form below to add a new package to your outfitter profile.
                 </p>
+                
+                {/* Draft Mode Reminder */}
+                {outfitterStatus === "PENDING" && (
+                    <div className="mt-4 bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-start gap-3">
+                        <AlertCircle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                        <p className="text-sm font-medium text-amber-800">
+                            <strong>Draft Mode Active:</strong> Because your account is currently pending permit verification, this hunt will automatically be saved as a Draft. You can publish it live once you are approved.
+                        </p>
+                    </div>
+                )}
             </div>
-            <HuntCreator outfitterId={outfitterId} outfitterName={outfitterName} />
+            
+            {/* Pass the status down to the actual form engine */}
+            <HuntCreator 
+                outfitterId={outfitterId} 
+                outfitterName={outfitterName} 
+                outfitterStatus={outfitterStatus} 
+            />
         </div>
     );
 }

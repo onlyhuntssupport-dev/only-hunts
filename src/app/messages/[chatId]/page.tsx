@@ -4,18 +4,17 @@ import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { auth, db } from "@/lib/firebase/client";
-// FIX: Imported arrayUnion to handle the archive array safely
 import { collection, doc, onSnapshot, query, orderBy, addDoc, updateDoc, getDoc, arrayUnion } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea"; 
-import { Send, ArrowLeft, Loader2, ShieldAlert, AlertCircle, Clock, ShieldCheck, CheckCircle2, Archive, Trash2 } from "lucide-react";
+import { Send, ArrowLeft, Loader2, ShieldAlert, AlertCircle, Clock, ShieldCheck, CheckCircle2, Archive } from "lucide-react";
 import KuduLoader from "@/components/ui/KuduLoader";
 
 interface Message {
   id: string;
   senderId: string;
   text: string;
-  createdAt: string;
+  createdAt: any; 
 }
 
 interface ChatData {
@@ -27,6 +26,7 @@ interface ChatData {
   participants: string[];
   leadStatus?: "NEW" | "FOLLOW-UP" | "NEGOTIATING" | "BOOKED" | "ARCHIVED";
   archivedBy?: string[];
+  unreadCount?: Record<string, number>;
 }
 
 const LEAD_STATUSES = [
@@ -84,37 +84,63 @@ export default function ChatRoomPage() {
 
     const chatRef = doc(db, "chats", chatId);
     
-    unsubChatRef.current = onSnapshot(chatRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data() as ChatData;
-        
-        if (!data.participants.includes(currentUserId)) {
-          router.push("/");
-          return;
+    unsubChatRef.current = onSnapshot(chatRef, 
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data() as ChatData;
+          
+          if (!data.participants.includes(currentUserId)) {
+            router.push("/");
+            return;
+          }
+          
+          // AGGRESSIVE READ RECEIPT: Only trigger if > 0 to prevent infinite write loops
+          const unreadObj = data.unreadCount || {};
+          if (unreadObj[currentUserId] > 0) {
+            updateDoc(chatRef, {
+              [`unreadCount.${currentUserId}`]: 0
+            }).catch(err => console.error("Failed to mark as read:", err));
+            
+            // Optimistically update local state so UI badge feels instant
+            data.unreadCount = { ...unreadObj, [currentUserId]: 0 };
+          }
+
+          setChatData(data);
+        } else {
+          router.push("/messages");
         }
-        
-        setChatData(data);
-        
-        updateDoc(chatRef, {
-          [`unreadCount.${currentUserId}`]: 0
-        }).catch(err => console.error("Failed to mark as read:", err));
-      } else {
-        router.push("/messages");
+      },
+      (error: any) => {
+        if (error.code === 'permission-denied') {
+          console.log("Waiting for database security rules to sync (Chat Room)...");
+        } else {
+          console.error("Chat room snapshot error:", error);
+        }
       }
-    });
+    );
 
     const messagesRef = collection(db, "chats", chatId, "messages");
     const q = query(messagesRef, orderBy("createdAt", "asc"));
     
-    unsubMessagesRef.current = onSnapshot(q, (snapshot) => {
-      const fetchedMessages = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Message[];
-      
-      setMessages(fetchedMessages);
-      setLoading(false);
-    });
+    unsubMessagesRef.current = onSnapshot(q, 
+      (snapshot) => {
+        const fetchedMessages = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Message[];
+        
+        setMessages(fetchedMessages);
+        setLoading(false);
+      },
+      (error: any) => {
+        if (error.code === 'permission-denied') {
+          console.log("Waiting for database security rules to sync (Chat Messages)...");
+        } else {
+          console.error("Chat messages snapshot error:", error);
+        }
+        setLoading(false);
+      }
+    );
 
     return () => {
       if (unsubChatRef.current) unsubChatRef.current();
@@ -159,9 +185,8 @@ export default function ChatRoomPage() {
     return phoneRegex.test(text) || urlRegex.test(text) || emailRegex.test(text);
   };
 
-  // FIX: The Archive Function
   const handleArchiveChat = async () => {
-    if (!window.confirm("Remove this conversation from your inbox? It will reappear if you receive a new message.")) return;
+    if (!window.confirm("Archive this conversation? It will reappear in your active inbox if you receive a new message.")) return;
     
     try {
       await updateDoc(doc(db, "chats", chatId), {
@@ -207,7 +232,7 @@ export default function ChatRoomPage() {
           lastMessage: messageText,
           updatedAt: timestamp,
           [`unreadCount.${otherUserId}`]: currentUnread + 1,
-          archivedBy: [] // FIX: Sending a message instantly un-archives the chat for everyone
+          archivedBy: [] 
         });
       }
 
@@ -262,6 +287,18 @@ export default function ChatRoomPage() {
     }
   };
 
+  const safeTimeString = (dateData: any) => {
+    if (!dateData) return '';
+    try {
+      if (typeof dateData.toDate === 'function') {
+        return dateData.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      }
+      return new Date(dateData).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch (e) {
+      return '';
+    }
+  };
+
   if (loading || !chatData) return <KuduLoader />;
 
   const isAdmin = userRole === "ADMIN" || userRole === "SUPER_ADMIN" || userRole === "SUPERADMIN";
@@ -308,9 +345,9 @@ export default function ChatRoomPage() {
                     {chatPartnerName}
                   </h1>
                   {chatData.type === "ADMIN_SUPPORT" && (
-                     <span className="text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter border shrink-0 bg-red-500/20 text-red-700 dark:text-red-400 border-red-500/30">
-                       Admin
-                     </span>
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter border shrink-0 bg-red-500/20 text-red-700 dark:text-red-400 border-red-500/30">
+                        Admin
+                      </span>
                   )}
                 </div>
                 <p className="text-sm font-medium text-olive/80 dark:text-off-white/80 truncate transition-colors">
@@ -319,15 +356,13 @@ export default function ChatRoomPage() {
               </div>
             </div>
 
-            {/* FIX: Add the Archive/Trash Button */}
             <Button 
-              variant="ghost" 
-              size="icon" 
               onClick={handleArchiveChat} 
               title="Archive Conversation"
-              className="text-red-400 hover:bg-red-500/10 hover:text-red-500 shrink-0 transition-colors"
+              className="bg-kalahari hover:bg-kalahari/80 text-white shadow-md flex items-center gap-2 h-10 px-4 shrink-0 transition-transform hover:scale-105"
             >
-              <Trash2 className="h-5 w-5" />
+              <Archive className="h-4 w-4" />
+              <span className="text-[10px] font-black uppercase tracking-wider hidden sm:inline-block">Archive</span>
             </Button>
           </div>
 
@@ -397,7 +432,7 @@ export default function ChatRoomPage() {
                       {msg.text}
                     </p>
                     <span className={`text-[10px] font-black mt-2 text-right transition-colors ${isMine ? "text-white/70" : "text-olive/50 dark:text-off-white/40"}`}>
-                      {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {safeTimeString(msg.createdAt)}
                     </span>
                   </div>
                 </div>

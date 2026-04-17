@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { MapPin, ShieldCheck, User } from 'lucide-react';
+import { MapPin, ShieldCheck, User, Award } from 'lucide-react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 
 interface HuntCardProps {
@@ -39,14 +39,27 @@ export default function HuntCard({ hunt }: HuntCardProps) {
             {hunt.title}
           </h3>
 
-          {/* --- NEW: OUTFITTER NAME SECTION --- */}
+          {/* --- UPDATED: OUTFITTER NAME SECTION WITH PREMIUM BADGE --- */}
           <div className="flex items-center gap-2 mb-4">
-            <div className="p-1 bg-kalahari/10 rounded-full">
-              <User size={12} className="text-olive dark:text-off-white/70" />
-            </div>
-            <span className="text-sm font-medium text-olive dark:text-off-white/70">
+            {hunt.outfitterIsPremium ? (
+              <div className="p-1 bg-amber-500/10 rounded-full border border-amber-500/30 shadow-sm">
+                <Award size={14} className="text-amber-500" />
+              </div>
+            ) : (
+              <div className="p-1 bg-kalahari/10 rounded-full">
+                <User size={12} className="text-olive dark:text-off-white/70" />
+              </div>
+            )}
+            
+            <span className={`text-sm ${hunt.outfitterIsPremium ? 'font-black text-amber-600 dark:text-amber-400' : 'font-medium text-olive dark:text-off-white/70'}`}>
               {hunt.outfitterName || "Professional Outfitter"}
             </span>
+
+            {hunt.outfitterIsPremium && (
+               <span className="text-[9px] font-black uppercase tracking-widest text-amber-600 bg-amber-500/20 px-1.5 py-0.5 rounded shadow-sm">
+                 Premium
+               </span>
+            )}
           </div>
 
           <div className="flex items-baseline gap-1">

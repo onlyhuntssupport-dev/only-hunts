@@ -1,4 +1,4 @@
-import { Metadata } from 'next';
+import { Metadata, ResolvingMetadata } from 'next';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -17,27 +17,59 @@ interface Props {
   params: Promise<{ id: string }>;
 }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata(
+  { params }: Props,
+  parent: ResolvingMetadata
+): Promise<Metadata> {
   const resolvedParams = await params;
   const { id } = resolvedParams;
   
-  const { data: hunt } = await getHuntById(id);
+  const rawResponse = await getHuntById(id);
+  // OVERRIDE: Tell TypeScript to trust our data structure
+  const hunt = rawResponse.data as any; 
   
   if (!hunt) {
-    return { title: 'Hunt Not Found' };
+    return { title: 'Hunt Not Found | Only-Hunts' };
   }
   
+  // Safely inherit previous images for fallbacks
+  const previousImages = (await parent).openGraph?.images || [];
+  const coverImg = hunt.coverImage || hunt.imageUrl;
+  
   const description = hunt.description 
-    ? hunt.description.substring(0, 160) + '...'
+    ? hunt.description.substring(0, 160) + (hunt.description.length > 160 ? '...' : '')
     : `Book this premium hunting package in ${hunt.location || hunt.province || 'South Africa'} with ${hunt.outfitterName || 'a premier outfitter'}.`;
+
+  const displayPrice = hunt.price || hunt.basePrice;
+  const ogTitle = displayPrice 
+    ? `${hunt.title || 'Untitled Hunt'} - $${displayPrice.toLocaleString()}`
+    : `${hunt.title || 'Untitled Hunt'} | Only-Hunts`;
 
   return {
     title: `${hunt.title || 'Untitled Hunt'} | Only-Hunts`,
     description: description,
     openGraph: {
-      title: hunt.title || 'Untitled Hunt',
-      description: `Premium hunting in ${hunt.location || hunt.province || 'South Africa'}`,
-      images: hunt.coverImage || hunt.imageUrl ? [hunt.coverImage || hunt.imageUrl] : [],
+      title: ogTitle,
+      description: description,
+      url: `https://only-hunts.com/hunts/${id}`,
+      siteName: 'Only-Hunts Marketplace',
+      images: coverImg ? [
+        {
+          url: coverImg,
+          width: 1200,
+          height: 630,
+          alt: hunt.title || 'Safari Package',
+        },
+        ...previousImages
+      ] : previousImages,
+      locale: 'en_US',
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: ogTitle,
+      description: description,
+      images: coverImg ? [coverImg] : [],
     },
   };
 }
@@ -46,7 +78,10 @@ export default async function HuntDetailPage({ params }: Props) {
   const resolvedParams = await params;
   const { id } = resolvedParams;
   
-  const { data: huntData, success } = await getHuntById(id);
+  const response = await getHuntById(id);
+  // OVERRIDE: Bypass the strict Type inference for the Firebase fetch
+  const success = response.success;
+  const huntData = response.data as any; 
   
   if (!success || !huntData) {
     notFound();
@@ -76,8 +111,9 @@ export default async function HuntDetailPage({ params }: Props) {
         .get();
         
       otherPackages = otherHuntsSnapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() }))
-        .filter(h => h.id !== huntData.id) // Exclude current package
+        // OVERRIDE: Cast the related packages as well
+        .map(doc => ({ id: doc.id, ...doc.data() } as any))
+        .filter((h: any) => h.id !== huntData.id) // Exclude current package
         .slice(0, 3); // Keep only up to 3
     } catch (error) {
       console.error("Error fetching other packages:", error);
@@ -89,7 +125,7 @@ export default async function HuntDetailPage({ params }: Props) {
   if (huntData.coverImage) allImages.push(huntData.coverImage);
   if (huntData.imageUrl && huntData.imageUrl !== huntData.coverImage) allImages.push(huntData.imageUrl);
   if (huntData.images && Array.isArray(huntData.images)) {
-    huntData.images.forEach(img => {
+    huntData.images.forEach((img: string) => {
       if (!allImages.includes(img)) allImages.push(img);
     });
   }
@@ -102,7 +138,6 @@ export default async function HuntDetailPage({ params }: Props) {
       
       {/* --- FIXED FULLSCREEN BACKGROUND --- */}
       <div className="fixed inset-0 z-0 pointer-events-none">
-        {/* Updated opacity to 40% (0.4) */}
         <div 
           className="absolute inset-0 z-0 bg-cover bg-[position:center_top] bg-no-repeat opacity-40"
           style={{ backgroundImage: "url('/watering-hole.jpg')" }}
@@ -294,17 +329,17 @@ export default async function HuntDetailPage({ params }: Props) {
                     More from {huntData.outfitterName || "this Outfitter"}
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    {otherPackages.map(pkg => (
+                    {otherPackages.map((pkg: any) => (
                       <Link href={`/hunts/${pkg.id}`} key={pkg.id} className="group bg-black/30 backdrop-blur-sm border border-kalahari/20 rounded-2xl overflow-hidden hover:border-kalahari/60 transition-colors block">
                         <div className="relative h-32 w-full bg-black/50">
                           {(pkg.coverImage || pkg.imageUrl) ? (
-                            <Image src={pkg.coverImage || pkg.imageUrl} alt={pkg.title} fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
+                            <Image src={pkg.coverImage || pkg.imageUrl} alt={pkg.title || "Safari Package"} fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
                           ) : (
                             <Compass className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-8 w-8 text-off-white/20" />
                           )}
                         </div>
                         <div className="p-4">
-                          <h4 className="text-sm font-bold text-white line-clamp-2 mb-2 group-hover:text-kalahari transition-colors">{pkg.title}</h4>
+                          <h4 className="text-sm font-bold text-white line-clamp-2 mb-2 group-hover:text-kalahari transition-colors">{pkg.title || "Untitled Package"}</h4>
                           <div className="flex items-center justify-between mt-auto">
                             <span className="text-[10px] font-bold text-off-white/50 uppercase tracking-widest flex items-center"><Calendar className="w-3 h-3 mr-1" /> {pkg.duration || "?"} D</span>
                             {(pkg.price || pkg.basePrice) && (

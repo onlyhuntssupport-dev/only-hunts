@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Inbox, Search, AlertTriangle, ShieldAlert, Wrench, MessageSquare, CheckCircle, Clock } from "lucide-react";
+// OVERRIDE: Added ChevronRight to imports
+import { Inbox, Search, AlertTriangle, ShieldAlert, Wrench, MessageSquare, CheckCircle, Clock, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import KuduLoader from "@/components/ui/KuduLoader";
 

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
+import Link from "next/link";
+import { AlertTriangle, Home, RefreshCcw } from "lucide-react";
 
 export default function GlobalError({
   error,
@@ -10,20 +12,41 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error(error);
+    // Optionally log to an external service like Sentry here
+    console.error("Only-Hunts Global Boundary Caught:", error);
   }, [error]);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-stone-950 text-white p-4">
-      <div className="bg-black/50 border border-red-500/30 p-8 rounded-2xl max-w-lg text-center">
-        <h2 className="text-2xl font-bold mb-4 text-red-500">System Error</h2>
-        <p className="text-stone-400 mb-6">Something went wrong while loading this page.</p>
-        <button
-          onClick={() => reset()}
-          className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition-colors"
-        >
-          Try Again
-        </button>
+    <div className="min-h-[80vh] flex flex-col items-center justify-center p-4">
+      <div className="bg-white dark:bg-kalahari/10 border border-red-200 dark:border-red-900/50 p-8 rounded-2xl max-w-md w-full text-center shadow-lg">
+        <div className="w-16 h-16 bg-red-50 dark:bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+          <AlertTriangle className="h-8 w-8 text-red-500" />
+        </div>
+        
+        <h2 className="text-2xl font-black font-headline text-stone-900 dark:text-off-white tracking-tight mb-2">
+          Lost the Trail
+        </h2>
+        <p className="text-sm font-bold text-stone-500 dark:text-stone-400 mb-8">
+          We encountered an unexpected snag while loading this specific view.
+        </p>
+        
+        <div className="flex flex-col gap-3">
+          <button
+            onClick={() => reset()}
+            className="w-full flex items-center justify-center gap-2 bg-kalahari hover:bg-olive text-white font-bold py-3 px-4 rounded-xl transition-colors tracking-wide uppercase text-sm"
+          >
+            <RefreshCcw className="w-4 h-4" />
+            Try Loading Again
+          </button>
+          
+          <Link
+            href="/"
+            className="w-full flex items-center justify-center gap-2 bg-stone-100 hover:bg-stone-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-stone-900 dark:text-white font-bold py-3 px-4 rounded-xl transition-colors tracking-wide uppercase text-sm"
+          >
+            <Home className="w-4 h-4" />
+            Return to Basecamp
+          </Link>
+        </div>
       </div>
     </div>
   );

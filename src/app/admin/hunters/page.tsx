@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase/client";
-// FIX: Added updateDoc and doc imports
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimestamp } from "firebase/firestore";
 import { getGlobalEntities, getEntityActivity, suspendUser, reinstateUser } from "@/app/actions/admins";
 import { Users, Search, ExternalLink, CheckCircle, History, ChevronRight, X, Mail, Database, Loader2, Target, PauseCircle, PlayCircle, MessageSquare } from "lucide-react";
@@ -16,7 +15,7 @@ export default function AdminHuntersDashboard() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   
-  const [selectedEntity, setSelectedEntity] = useState<any | null>(null);
+  const [selectedEntity, setSelectedEntity] = useState<any>(null);
   const [isInspecting, setIsInspecting] = useState(false);
   const [entityActivity, setEntityActivity] = useState<any>(null);
   const [isSuspending, setIsSuspending] = useState(false);
@@ -90,7 +89,8 @@ export default function AdminHuntersDashboard() {
         }
       });
 
-      let chatIdToRoute = existingChatId;
+      // OVERRIDE: Explicitly cast to string | null
+      let chatIdToRoute: string | null = existingChatId;
 
       if (!chatIdToRoute) {
         const newChatRef = await addDoc(chatsRef, {
@@ -107,7 +107,6 @@ export default function AdminHuntersDashboard() {
         });
         chatIdToRoute = newChatRef.id;
       } else {
-        // FIX: Self-heal old test chats by injecting the missing name
         await updateDoc(doc(db, "chats", chatIdToRoute), {
           hunterName: selectedEntity.name || "Hunter",
           type: "ADMIN_SUPPORT"
@@ -186,7 +185,6 @@ export default function AdminHuntersDashboard() {
         </div>
       </div>
 
-      {/* GOD PANEL DOSSIER */}
       {selectedEntity && (
         <div className="absolute inset-y-0 right-0 w-full lg:w-[450px] bg-white dark:bg-stone-900 shadow-[-20px_0_50px_rgba(0,0,0,0.2)] z-50 animate-in slide-in-from-right duration-300 border-l-4 border-kalahari overflow-y-auto">
           <div className="p-8 h-full flex flex-col">

@@ -15,6 +15,9 @@ import AuthModal from "@/components/auth/AuthModal";
 // TRUST SIGNALS ACTIVATED
 import TrustBanner from "@/components/ui/TrustBanner";
 
+// NEW: Mission Card Component
+import MissionCard from "@/components/home/MissionCard";
+
 interface Hunt {
   id: string;
   status: string;
@@ -428,6 +431,9 @@ export default function HomePage({ searchParams }: { searchParams: any }) {
           </div>
         </div>
       </section>
+
+      {/* THE MISSION CARD COMPONENT INSTALLED HERE */}
+      <MissionCard />
 
     </div>
   );

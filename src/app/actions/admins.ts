@@ -2,7 +2,36 @@
 
 import { revalidatePath } from "next/cache";
 import { adminDb, adminAuth } from "@/lib/firebase/admin";
-import { sendPlatformEmail } from "@/lib/email/sender"; // NEW: Centralized Email Engine
+import { sendPlatformEmail } from "@/lib/email/sender";
+
+// ============================================================================
+// UTILITY: FIRESTORE SERIALIZER (Prevents Next.js Boundary Crash)
+// ============================================================================
+function serializeFirestoreData(obj: any): any {
+  if (obj === null || obj === undefined) return obj;
+
+  if (typeof obj === 'object' && typeof obj.toDate === 'function') {
+    return obj.toDate().toISOString();
+  }
+
+  if (obj instanceof Date) {
+    return obj.toISOString();
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(item => serializeFirestoreData(item));
+  }
+
+  if (typeof obj === 'object') {
+    const serialized: Record<string, any> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      serialized[key] = serializeFirestoreData(value);
+    }
+    return serialized;
+  }
+
+  return obj;
+}
 
 // ============================================================================
 // 1. ADMIN MANAGEMENT ACTIONS 
@@ -67,7 +96,7 @@ export async function getAdmins() {
       ...doc.data()
     }));
 
-    return { success: true, data: entities };
+    return { success: true, data: serializeFirestoreData(entities) };
   } catch (err: any) {
     console.error("Admin fetch error:", err);
     return { success: false, error: "Failed to fetch admin team." };
@@ -78,27 +107,30 @@ export async function getAdmins() {
 // 2. PLATFORM APPROVAL, VERIFICATION & SUSPENSION ACTIONS 
 // ============================================================================
 
-// NEW: 14-Day Trial Engine + Automated Email
 export async function approveOutfitter(uid: string) {
   try {
-    // 1. Fetch outfitter details for the email
     const outfitterDoc = await adminDb.collection('outfitters').doc(uid).get();
     if (!outfitterDoc.exists) throw new Error('Outfitter not found');
     const outfitterData = outfitterDoc.data();
 
-    // 2. Calculate exactly 14 days
     const trialExpirationDate = new Date();
     trialExpirationDate.setDate(trialExpirationDate.getDate() + 14);
 
-    // 3. Update the outfitter document with the SaaS payload
+    const timestamp = new Date().toISOString();
+
     await adminDb.collection('outfitters').doc(uid).update({
       status: 'ACTIVE',
       tier: 'free_trial',
       subscriptionEndsAt: trialExpirationDate, 
-      updatedAt: new Date().toISOString(),
+      updatedAt: timestamp,
     });
 
-    // 4. Fire the automated welcome email
+    await adminDb.collection('users').doc(uid).update({
+      status: 'ACTIVE',
+      tier: 'free_trial',
+      updatedAt: timestamp,
+    });
+
     if (outfitterData?.email) {
       await sendPlatformEmail({
         to: outfitterData.email,
@@ -118,6 +150,7 @@ export async function approveOutfitter(uid: string) {
     }
 
     revalidatePath("/admin/approvals");
+    revalidatePath("/admin/outfitters");
     return { success: true };
   } catch (error: any) {
     console.error(`Error approving outfitter ${uid}:`, error);
@@ -127,12 +160,22 @@ export async function approveOutfitter(uid: string) {
 
 export async function verifyOutfitter(outfitterId: string) {
   try {
+    const timestamp = new Date().toISOString();
+    
     await adminDb.collection("users").doc(outfitterId).update({
       status: "VERIFIED", 
       isVerified: true,
-      updatedAt: new Date().toISOString()
+      updatedAt: timestamp
     });
+    
+    await adminDb.collection("outfitters").doc(outfitterId).update({
+      status: "VERIFIED", 
+      isVerified: true,
+      updatedAt: timestamp
+    }).catch(() => {}); 
+
     revalidatePath("/admin");
+    revalidatePath("/admin/outfitters");
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -141,11 +184,18 @@ export async function verifyOutfitter(outfitterId: string) {
 
 export async function rejectOutfitter(outfitterId: string) {
   try {
+    const timestamp = new Date().toISOString();
     await adminDb.collection("users").doc(outfitterId).update({
       status: "REJECTED",
       isVerified: false,
-      updatedAt: new Date().toISOString()
+      updatedAt: timestamp
     });
+    await adminDb.collection("outfitters").doc(outfitterId).update({
+      status: "REJECTED",
+      isVerified: false,
+      updatedAt: timestamp
+    }).catch(() => {});
+
     revalidatePath("/admin");
     return { success: true };
   } catch (error: any) {
@@ -155,10 +205,16 @@ export async function rejectOutfitter(outfitterId: string) {
 
 export async function suspendUser(userId: string) {
   try {
+    const timestamp = new Date().toISOString();
     await adminDb.collection("users").doc(userId).update({
       status: "SUSPENDED",
-      updatedAt: new Date().toISOString()
+      updatedAt: timestamp
     });
+    await adminDb.collection("outfitters").doc(userId).update({
+      status: "SUSPENDED",
+      updatedAt: timestamp
+    }).catch(() => {});
+
     revalidatePath("/admin");
     return { success: true };
   } catch (error: any) {
@@ -168,10 +224,16 @@ export async function suspendUser(userId: string) {
 
 export async function reinstateUser(userId: string) {
   try {
+    const timestamp = new Date().toISOString();
     await adminDb.collection("users").doc(userId).update({
       status: "VERIFIED", 
-      updatedAt: new Date().toISOString()
+      updatedAt: timestamp
     });
+    await adminDb.collection("outfitters").doc(userId).update({
+      status: "VERIFIED", 
+      updatedAt: timestamp
+    }).catch(() => {});
+
     revalidatePath("/admin");
     return { success: true };
   } catch (error: any) {
@@ -241,15 +303,20 @@ export async function getAdminMarketplaceStats() {
 
 export async function getGlobalEntities(type: "outfitter" | "hunter") {
   try {
-    const usersRef = adminDb.collection("users");
-    const snapshot = await usersRef.where("role", "==", type.toUpperCase()).get();
+    let snapshot;
+    
+    if (type === "outfitter") {
+      snapshot = await adminDb.collection("outfitters").get();
+    } else {
+      snapshot = await adminDb.collection("users").where("role", "==", "HUNTER").get();
+    }
     
     const entities = snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }));
 
-    return { success: true, data: entities };
+    return { success: true, data: serializeFirestoreData(entities) };
   } catch (err: any) {
     console.error("Entity fetch error:", err);
     return { success: false, error: "Failed to fetch entities" };
@@ -282,7 +349,7 @@ export async function getEntityActivity(userId: string, role: string) {
       };
     }
 
-    return { success: true, data: activity };
+    return { success: true, data: serializeFirestoreData(activity) };
   } catch (error: any) {
     console.error("Activity fetch error:", error);
     return { success: false, error: "Failed to fetch entity activity." };
@@ -316,11 +383,36 @@ export async function getFinancialLedger() {
 
     return { 
       success: true, 
-      data: transactions,
+      data: serializeFirestoreData(transactions),
       stats: { mrr, totalRevenue, activeSubs }
     };
   } catch (err: any) {
     console.error("Ledger fetch error:", err);
     return { success: false, error: "Failed to fetch financial ledger." };
+  }
+}
+
+// ============================================================================
+// 6. THE NUKE COMMAND (Permanent Deletion)
+// ============================================================================
+
+export async function nukeOutfitter(uid: string) {
+  try {
+    try {
+      await adminAuth.deleteUser(uid);
+    } catch (authError: any) {
+      console.warn(`Auth user ${uid} not found. Proceeding to database wipe...`);
+    }
+
+    await adminDb.collection("outfitters").doc(uid).delete();
+    await adminDb.collection("users").doc(uid).delete();
+
+    revalidatePath("/admin/outfitters");
+    revalidatePath("/admin");
+    
+    return { success: true };
+  } catch (error: any) {
+    console.error(`CRITICAL: Error nuking outfitter ${uid}:`, error);
+    return { success: false, error: error.message };
   }
 }

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useTransition } from 'react';
@@ -163,7 +162,7 @@ export default function HuntsTable({ initialHunts }: { initialHunts: Hunt[] }) {
             <AlertDialogAction
               onClick={handleDeleteConfirm}
               disabled={isPending}
-              variant="destructive"
+              className="bg-red-600 text-white hover:bg-red-700"
             >
               {isPending ? 'Deleting...' : 'Delete'}
             </AlertDialogAction>

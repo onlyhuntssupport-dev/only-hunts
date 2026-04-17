@@ -13,6 +13,7 @@ import { Loader2, UploadCloud, X, DollarSign } from "lucide-react";
 interface HuntCreatorProps {
   outfitterId: string;
   outfitterName: string;
+  outfitterStatus: string; // <-- Added the new prop
 }
 
 // --- CONSTANTS FOR DROPDOWNS ---
@@ -30,14 +31,13 @@ const SA_PLAINS_GAME = [
 
 const DURATIONS = Array.from({ length: 20 }, (_, i) => i + 1); // [1, 2, ..., 20]
 
-export default function HuntCreator({ outfitterId, outfitterName }: HuntCreatorProps) {
+export default function HuntCreator({ outfitterId, outfitterName, outfitterStatus }: HuntCreatorProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [images, setImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   
-  // Updated state with default values for the dropdowns and slider
   const [formData, setFormData] = useState({
     title: "",
     primarySpecies: SA_PLAINS_GAME[10], // Default to Kudu
@@ -105,13 +105,15 @@ export default function HuntCreator({ outfitterId, outfitterName }: HuntCreatorP
         description: formData.description,
         images: uploadedUrls,
         coverImage: uploadedUrls[0], // Set the first image as the cover
+        // FIX: Force DRAFT status if the outfitter is not fully verified yet
+        status: outfitterStatus === "PENDING" ? "DRAFT" : "ACTIVE", 
       };
 
       // 3. Save to Firestore via Server Action
       const result = await createHuntListing(huntData, outfitterId);
 
       if (result.success) {
-        router.push("/outfitter/dashboard");
+        router.push("/outfitter/dashboard/hunts"); // Redirects to their hunts list
       } else {
         setError(result.error || "Failed to create listing. Ensure your account is ACTIVE.");
         setLoading(false);
@@ -273,9 +275,11 @@ export default function HuntCreator({ outfitterId, outfitterName }: HuntCreatorP
         <Button type="button" variant="outline" onClick={() => router.back()} disabled={loading} className="h-12 px-6 font-bold border-kalahari text-olive dark:text-off-white hover:bg-kalahari/10">Cancel</Button>
         <Button type="submit" disabled={loading} className="bg-olive hover:bg-olive/90 text-kalahari h-12 px-8 text-lg font-black shadow-md transition-all">
           {loading ? (
-            <><Loader2 className="h-5 w-5 animate-spin mr-2" /> Uploading...</>
+            <><Loader2 className="h-5 w-5 animate-spin mr-2" /> Saving...</>
+          ) : outfitterStatus === "PENDING" ? (
+            "Save as Draft"
           ) : (
-            "Submit for Approval"
+            "Publish Package"
           )}
         </Button>
       </div>

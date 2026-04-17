@@ -3,10 +3,9 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase/client";
-// FIX: Added updateDoc and doc imports
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimestamp } from "firebase/firestore";
-import { getGlobalEntities, getEntityActivity, verifyOutfitter, suspendUser, reinstateUser } from "@/app/actions/admins";
-import { Store, Search, ExternalLink, CheckCircle, Activity, History, AlertTriangle, ChevronRight, X, Mail, Database, Loader2, Package, FileText, FileQuestion, PauseCircle, PlayCircle, MessageSquare } from "lucide-react";
+import { getGlobalEntities, getEntityActivity, verifyOutfitter, suspendUser, reinstateUser, nukeOutfitter } from "@/app/actions/admins";
+import { Store, Search, ExternalLink, CheckCircle, Activity, History, AlertTriangle, ChevronRight, X, Mail, Database, Loader2, Package, FileText, FileQuestion, PauseCircle, PlayCircle, MessageSquare, Trash2, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import KuduLoader from "@/components/ui/KuduLoader";
 
@@ -16,12 +15,13 @@ export default function AdminOutfittersDashboard() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   
-  const [selectedEntity, setSelectedEntity] = useState<any | null>(null);
+  const [selectedEntity, setSelectedEntity] = useState<any>(null);
   const [isInspecting, setIsInspecting] = useState(false);
   const [entityActivity, setEntityActivity] = useState<any>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isSuspending, setIsSuspending] = useState(false);
   const [isMessaging, setIsMessaging] = useState(false);
+  const [isNuking, setIsNuking] = useState(false); 
 
   useEffect(() => {
     const load = async () => {
@@ -80,6 +80,25 @@ export default function AdminOutfittersDashboard() {
     setIsSuspending(false);
   };
 
+  const handleNukeOutfitter = async () => {
+    if (!selectedEntity) return;
+    
+    const confirmMsg = "🚨 WARNING: Are you absolutely sure you want to NUKE this outfitter? This will permanently delete their Auth account, their user profile, and their outfitter profile. This CANNOT be undone.";
+      
+    if (!window.confirm(confirmMsg)) return;
+
+    setIsNuking(true);
+    const res = await nukeOutfitter(selectedEntity.id);
+    
+    if (res.success) {
+      setOutfitters(outfitters.filter(e => e.id !== selectedEntity.id));
+      setSelectedEntity(null); 
+    } else {
+      alert("Failed to delete outfitter completely: " + res.error);
+    }
+    setIsNuking(false);
+  };
+
   const handleOpenDirectMessage = async () => {
     if (!auth.currentUser || !selectedEntity) {
       alert("Authentication error. Please refresh the page.");
@@ -104,7 +123,7 @@ export default function AdminOutfittersDashboard() {
         }
       });
 
-      let chatIdToRoute = existingChatId;
+      let chatIdToRoute: string | null = existingChatId;
 
       if (!chatIdToRoute) {
         const newChatRef = await addDoc(chatsRef, {
@@ -121,7 +140,6 @@ export default function AdminOutfittersDashboard() {
         });
         chatIdToRoute = newChatRef.id;
       } else {
-        // FIX: Self-heal old test chats by injecting the missing name
         await updateDoc(doc(db, "chats", chatIdToRoute), {
           outfitterName: selectedEntity.companyName || selectedEntity.name || "Outfitter",
           type: "ADMIN_SUPPORT"
@@ -202,7 +220,6 @@ export default function AdminOutfittersDashboard() {
         </div>
       </div>
 
-      {/* GOD PANEL DOSSIER */}
       {selectedEntity && (
         <div className="absolute inset-y-0 right-0 w-full lg:w-[450px] bg-white dark:bg-stone-900 shadow-[-20px_0_50px_rgba(0,0,0,0.2)] z-50 animate-in slide-in-from-right duration-300 border-l-4 border-kalahari overflow-y-auto">
           <div className="p-8 h-full flex flex-col">
@@ -218,9 +235,15 @@ export default function AdminOutfittersDashboard() {
             <h3 className="text-2xl font-black text-olive dark:text-off-white leading-tight mb-2">
               {selectedEntity.companyName || selectedEntity.name || "Unknown"}
             </h3>
-            <p className="text-kalahari font-bold text-sm mb-6 flex items-center gap-2">
-               <Mail className="h-4 w-4" /> {selectedEntity.email}
-            </p>
+            
+            <div className="mb-6 space-y-2">
+              <p className="text-kalahari font-bold text-sm flex items-center gap-2">
+                 <Mail className="h-4 w-4" /> {selectedEntity.email}
+              </p>
+              <p className="text-olive/70 dark:text-off-white/60 font-bold text-sm flex items-center gap-2">
+                 <Phone className="h-4 w-4" /> {selectedEntity.phone || selectedEntity.phoneNumber || "No phone number provided"}
+              </p>
+            </div>
 
             <div className="space-y-4 flex-1">
               <DossierItem icon={History} label="Account Created" value={selectedEntity.createdAt ? new Date(selectedEntity.createdAt).toLocaleDateString() : "Unknown"} />
@@ -276,6 +299,17 @@ export default function AdminOutfittersDashboard() {
                     {isSuspending ? <Loader2 className="h-5 w-5 animate-spin" /> : selectedEntity.status === "SUSPENDED" ? <PlayCircle className="h-5 w-5" /> : <PauseCircle className="h-5 w-5" />} 
                     {selectedEntity.status === "SUSPENDED" ? "Reinstate Account" : "Suspend Account"}
                   </button>
+                  
+                  <div className="pt-4 border-t border-red-500/20 mt-4">
+                    <button 
+                      onClick={handleNukeOutfitter} 
+                      disabled={isNuking} 
+                      className="w-full flex items-center justify-center gap-3 p-4 bg-red-50 text-red-600 rounded-xl font-black hover:bg-red-100 transition-all border border-red-200 disabled:opacity-50"
+                    >
+                      {isNuking ? <Loader2 className="h-5 w-5 animate-spin" /> : <Trash2 className="h-5 w-5" />} 
+                      {isNuking ? "Nuking User Data..." : "Permanently Delete Outfitter"}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

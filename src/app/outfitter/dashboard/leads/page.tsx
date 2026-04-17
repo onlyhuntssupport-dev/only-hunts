@@ -36,7 +36,8 @@ export default function OutfitterLeadsPage() {
         const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         
         // Client-side sort (newest first)
-        fetched.sort((a, b) => {
+        // OVERRIDE: Cast to any to bypass strict type checking on createdAt
+        fetched.sort((a: any, b: any) => {
           const dateA = a.createdAt?.toMillis?.() || 0;
           const dateB = b.createdAt?.toMillis?.() || 0;
           return dateB - dateA;

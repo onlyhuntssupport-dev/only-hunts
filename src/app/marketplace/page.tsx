@@ -177,8 +177,9 @@ function MarketplaceContent() {
                   )}
 
                   <div className="relative h-48 w-full bg-black/50 border-b border-white/10 overflow-hidden flex items-center justify-center">
+                    {/* OVERRIDE: Added optional chaining to hunt.images to appease TS */}
                     {hunt.coverImage || hunt.imageUrl || (hunt.images && hunt.images[0]) ? (
-                      <Image src={hunt.coverImage || hunt.imageUrl || hunt.images[0]} alt={hunt.title || "Hunting Package"} fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
+                      <Image src={hunt.coverImage || hunt.imageUrl || hunt.images?.[0] || "/placeholder.jpg"} alt={hunt.title || "Hunting Package"} fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
                     ) : (
                       <div className="opacity-30 grayscale drop-shadow-sm">
                         <Image src="/logo-transparent.png" alt="Placeholder" width={64} height={64} />
@@ -196,7 +197,8 @@ function MarketplaceContent() {
                         {(hunt.price || hunt.basePrice) && (
                           <div className="bg-black/80 text-kalahari font-bold px-2 py-1 rounded text-xs flex items-center shrink-0 border border-white/10 shadow-sm">
                             <DollarSign className="h-3 w-3 mr-0.5" />
-                            {(hunt.price || hunt.basePrice).toLocaleString()}
+                            {/* OVERRIDE: Added || 0 fallback for toLocaleString */}
+                            {(hunt.price || hunt.basePrice || 0).toLocaleString()}
                           </div>
                         )}
                       </div>

@@ -40,15 +40,18 @@ export default function OutfitterStorefront({ params }: Props) {
       try {
         const res = await getOutfitterProfileData(outfitterId);
         
-        if (res.success) {
+        if (res.success && res.outfitter) {
+          // OVERRIDE: Tell TypeScript to trust the shape of our Firestore document
+          const outfitterData = res.outfitter as any; 
+          
           setOutfitter({
-            ...res.outfitter,
-            isPro: res.outfitter.isPro !== false,
-            accreditations: res.outfitter.accreditations || [],
-            gallery: res.outfitter.gallery || [],
-            campType: res.outfitter.campType || "Premium Safari Lodge",
-            terrain: res.outfitter.terrain || "Diverse African Bushveld",
-            yearsInBusiness: res.outfitter.yearsInBusiness || "Established",
+            ...outfitterData,
+            isPro: outfitterData.isPro !== false,
+            accreditations: outfitterData.accreditations || [],
+            gallery: outfitterData.gallery || [],
+            campType: outfitterData.campType || "Premium Safari Lodge",
+            terrain: outfitterData.terrain || "Diverse African Bushveld",
+            yearsInBusiness: outfitterData.yearsInBusiness || "Established",
           });
           
           const sortedHunts = (res.hunts || []).sort((a: any, b: any) => {

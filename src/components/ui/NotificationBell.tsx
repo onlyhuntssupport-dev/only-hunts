@@ -47,13 +47,23 @@ export default function NotificationBell() {
         orderBy("createdAt", "desc")
       );
 
-      const unsubscribeSnap = onSnapshot(q, (snapshot) => {
-        const notifs: AppNotification[] = [];
-        snapshot.forEach((doc) => {
-          notifs.push({ id: doc.id, ...doc.data() } as AppNotification);
-        });
-        setNotifications(notifs);
-      });
+      const unsubscribeSnap = onSnapshot(q, 
+        (snapshot) => {
+          const notifs: AppNotification[] = [];
+          snapshot.forEach((doc) => {
+            notifs.push({ id: doc.id, ...doc.data() } as AppNotification);
+          });
+          setNotifications(notifs);
+        },
+        (error: any) => {
+          // Gracefully handle the login race condition without crashing the console
+          if (error.code === 'permission-denied') {
+            console.log("Waiting for database security rules to sync (Notifications)...");
+          } else {
+            console.error("Notification snapshot error:", error);
+          }
+        }
+      );
 
       return () => unsubscribeSnap();
     });

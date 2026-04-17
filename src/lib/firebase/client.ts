@@ -2,6 +2,7 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -12,10 +13,18 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Initialize Firebase only if it hasn't been initialized yet
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
-export { app, auth, db, storage };
+let appCheck;
+if (typeof window !== "undefined") {
+  appCheck = initializeAppCheck(app, {
+    provider: new ReCaptchaV3Provider("6Lc9orYsAAAAAOWl6-Dqw3qeaszRmR-pUb2h8Q1k"),
+    isTokenAutoRefreshEnabled: true
+  });
+}
+
+// UPDATE: Added firebaseConfig to the export
+export { firebaseConfig, app, auth, db, storage, appCheck };

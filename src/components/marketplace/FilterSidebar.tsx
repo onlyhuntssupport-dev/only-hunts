@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
@@ -58,7 +57,7 @@ export default function FilterSidebar() {
     <aside className="w-full md:w-72 shrink-0 bg-card p-6 border rounded-lg h-fit sticky top-24">
       <div className='flex items-center justify-between mb-4'>
         <h2 className="text-xl font-headline font-bold text-foreground">Filters</h2>
-        <Button variant="link" className="p-0 h-auto text-sm" onClick={() => router.push(pathname, { scroll: false })}>Clear</Button>
+        <Button variant="ghost" className="p-0 h-auto text-sm text-kalahari hover:text-kalahari/80 bg-transparent hover:bg-transparent" onClick={() => router.push(pathname, { scroll: false })}>Clear</Button>
       </div>
       {createCheckboxGroup('Province', PROVINCES, 'province')}
       {createCheckboxGroup('Species', SPECIES, 'species')}

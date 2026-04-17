@@ -5,9 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { auth, db } from "@/lib/firebase/client";
-import { collection, query, where, orderBy, onSnapshot, getDoc, doc } from "firebase/firestore";
+import { collection, query, where, orderBy, onSnapshot, getDoc, doc, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
-// FIX: Imported Inbox and Archive icons for the tabs
 import { MessageSquare, ArrowLeft, Search, Clock, Inbox, Archive } from "lucide-react";
 import KuduLoader from "@/components/ui/KuduLoader";
 
@@ -20,7 +19,7 @@ interface ChatPreview {
   type?: string;
   participants: string[];
   lastMessage: string;
-  updatedAt: string;
+  updatedAt: any; // FIX: Allow Timestamps
   unreadCount: Record<string, number>;
   leadStatus?: "NEW" | "FOLLOW-UP" | "NEGOTIATING" | "BOOKED" | "ARCHIVED";
   archivedBy?: string[];
@@ -32,10 +31,7 @@ export default function InboxPage() {
   const [chats, setChats] = useState<ChatPreview[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [userRole, setUserRole] = useState<string | null>(null);
-  
-  // FIX: Added state for the tab switcher
   const [viewMode, setViewMode] = useState<"ACTIVE" | "ARCHIVED">("ACTIVE");
-  
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const unsubChatsRef = useRef<(() => void) | null>(null);
 
@@ -76,18 +72,25 @@ export default function InboxPage() {
       orderBy("updatedAt", "desc")
     );
 
-    unsubChatsRef.current = onSnapshot(q, (snapshot) => {
-      const fetchedChats = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as ChatPreview[];
-      
-      setChats(fetchedChats);
-      setLoading(false);
-    }, (error) => {
-      console.error("Error fetching chats:", error);
-      setLoading(false);
-    });
+    unsubChatsRef.current = onSnapshot(q, 
+      (snapshot) => {
+        const fetchedChats = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as ChatPreview[];
+        
+        setChats(fetchedChats);
+        setLoading(false);
+      }, 
+      (error: any) => {
+        if (error.code === 'permission-denied') {
+          console.log("Waiting for database security rules to sync (Inbox)...");
+        } else {
+          console.error("Error fetching chats:", error);
+        }
+        setLoading(false);
+      }
+    );
 
     return () => {
       if (unsubChatsRef.current) {
@@ -97,6 +100,49 @@ export default function InboxPage() {
     };
   }, [currentUserId]);
 
+  const handleArchiveChat = async (e: React.MouseEvent, chatId: string) => {
+    e.preventDefault(); 
+    e.stopPropagation(); 
+    
+    if (!window.confirm("Archive this conversation?")) return;
+    
+    try {
+      await updateDoc(doc(db, "chats", chatId), {
+        archivedBy: arrayUnion(currentUserId)
+      });
+    } catch (err) {
+      console.error("Failed to archive chat:", err);
+      alert("Failed to archive chat.");
+    }
+  };
+
+  const handleUnarchiveChat = async (e: React.MouseEvent, chatId: string) => {
+    e.preventDefault(); 
+    e.stopPropagation();
+    
+    try {
+      await updateDoc(doc(db, "chats", chatId), {
+        archivedBy: arrayRemove(currentUserId)
+      });
+    } catch (err) {
+      console.error("Failed to unarchive chat:", err);
+      alert("Failed to unarchive chat.");
+    }
+  };
+
+  // FIX: Safe Date Parser
+  const safeDateString = (dateData: any) => {
+    if (!dateData) return 'Just now';
+    try {
+      if (typeof dateData.toDate === 'function') {
+        return dateData.toDate().toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      }
+      return new Date(dateData).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    } catch (e) {
+      return 'Unknown date';
+    }
+  };
+
   if (loading) return <KuduLoader />;
 
   const isAdmin = userRole === "ADMIN" || userRole === "SUPER_ADMIN" || userRole === "SUPERADMIN";
@@ -104,12 +150,10 @@ export default function InboxPage() {
   const filteredChats = chats.filter(chat => {
     const isArchived = chat.archivedBy && chat.archivedBy.includes(currentUserId || "");
 
-    // FIX: Apply the Active/Archived filter before checking the search query
     if (viewMode === "ACTIVE" && isArchived) return false;
     if (viewMode === "ARCHIVED" && !isArchived) return false;
 
     let partnerName = "Unknown";
-    
     if (chat.type === "ADMIN_SUPPORT") {
       partnerName = isAdmin ? (chat.hunterName || chat.outfitterName || "User") : "Platform Support";
     } else {
@@ -117,7 +161,7 @@ export default function InboxPage() {
       partnerName = isHunter ? (chat.outfitterName || "Outfitter") : (chat.hunterName || "Hunter");
     }
 
-    const huntTitle = chat.huntTitle || "Platform Support";
+    const huntTitle = chat.huntTitle || "Inquiry";
     const searchLower = searchQuery.toLowerCase();
     
     return partnerName.toLowerCase().includes(searchLower) || huntTitle.toLowerCase().includes(searchLower);
@@ -130,7 +174,6 @@ export default function InboxPage() {
     dashboardRoute = "/admin";
   }
 
-  // FIX: Calculate counts for the tabs
   const activeCount = chats.filter(c => !(c.archivedBy && c.archivedBy.includes(currentUserId || ""))).length;
   const archivedCount = chats.filter(c => c.archivedBy && c.archivedBy.includes(currentUserId || "")).length;
 
@@ -169,7 +212,6 @@ export default function InboxPage() {
 
       <div className="relative z-10 max-w-4xl mx-auto px-6 mt-8 space-y-6">
         
-        {/* FIX: The Tab Switcher */}
         <div className="flex items-center gap-2 bg-white/80 dark:bg-black/50 p-1.5 rounded-2xl backdrop-blur-sm w-fit border-2 border-kalahari/20 dark:border-kalahari/40 shadow-sm transition-colors">
           <button 
             onClick={() => setViewMode("ACTIVE")} 
@@ -185,7 +227,6 @@ export default function InboxPage() {
           </button>
         </div>
 
-        {/* Search Bar */}
         {(activeCount > 0 || archivedCount > 0) && (
           <div className="relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-olive dark:text-kalahari/70" />
@@ -199,7 +240,6 @@ export default function InboxPage() {
           </div>
         )}
 
-        {/* Inbox Feed */}
         {chats.length === 0 ? (
           <div className="text-center py-20 bg-white/95 dark:bg-black/50 backdrop-blur-sm border-2 border-dashed border-kalahari/30 dark:border-kalahari/40 rounded-2xl shadow-xl transition-colors">
             <MessageSquare className="mx-auto h-16 w-16 text-kalahari/40 mb-4" />
@@ -240,9 +280,12 @@ export default function InboxPage() {
                 partnerName = isHunter ? (chat.outfitterName || "Outfitter") : (chat.hunterName || "Hunter");
               }
 
-              const huntTitle = chat.huntTitle || "Platform Support";
+              const displayTitle = chat.type === "ADMIN_SUPPORT" 
+                ? (chat.huntTitle === "Platform Support" ? "Account Assistance" : (chat.huntTitle || "Account Assistance")) 
+                : (chat.huntTitle || "Custom Inquiry");
+
               const unreadCount = chat.unreadCount?.[currentUserId || ""] || 0;
-              const hasUnread = unreadCount > 0 && viewMode === "ACTIVE"; // Archived chats shouldn't ping as unread
+              const hasUnread = unreadCount > 0 && viewMode === "ACTIVE";
 
               return (
                 <Link 
@@ -271,7 +314,7 @@ export default function InboxPage() {
 
                         {chat.type === "ADMIN_SUPPORT" && (
                            <span className="text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter border shrink-0 bg-red-500/20 text-red-700 dark:text-red-400 border-red-500/30">
-                             Official Support
+                              Official Support
                            </span>
                         )}
 
@@ -283,7 +326,7 @@ export default function InboxPage() {
                       </div>
                       
                       <p className="text-xs font-bold text-kalahari uppercase tracking-widest mb-2 truncate transition-colors">
-                        {huntTitle}
+                        {displayTitle}
                       </p>
                       
                       <p className={`text-sm truncate transition-colors ${hasUnread ? 'font-bold text-olive dark:text-off-white' : 'font-medium text-olive dark:text-off-white/70'}`}>
@@ -291,11 +334,37 @@ export default function InboxPage() {
                       </p>
                     </div>
 
-                    <div className="flex flex-col items-end shrink-0">
+                    <div className="flex flex-col items-end justify-between shrink-0 gap-3">
                       <span className="text-xs font-bold text-olive/80 dark:text-off-white/50 flex items-center gap-1 transition-colors">
                         <Clock className="h-3 w-3" />
-                        {chat.updatedAt ? new Date(chat.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'Just now'}
+                        {safeDateString(chat.updatedAt)}
                       </span>
+                      
+                      {viewMode === "ACTIVE" ? (
+                        <Button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleArchiveChat(e, chat.id);
+                          }}
+                          className="bg-kalahari hover:bg-kalahari/80 text-white shadow-md flex items-center gap-2 h-9 px-3 transition-transform hover:scale-105"
+                        >
+                          <Archive className="h-4 w-4" />
+                          <span className="text-[10px] font-black uppercase tracking-wider">Archive</span>
+                        </Button>
+                      ) : (
+                        <Button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleUnarchiveChat(e, chat.id);
+                          }}
+                          className="bg-olive hover:bg-olive/90 dark:bg-off-white dark:text-olive text-white shadow-md flex items-center gap-2 h-9 px-3 transition-transform hover:scale-105"
+                        >
+                          <Inbox className="h-4 w-4" />
+                          <span className="text-[10px] font-black uppercase tracking-wider">Restore</span>
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </Link>

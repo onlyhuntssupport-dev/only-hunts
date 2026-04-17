@@ -28,3 +28,5 @@ export const HuntSchema = z.object({
 });
 
 export type HuntFormData = z.infer<typeof HuntSchema>;
+// ALIAS EXPORT ADDED HERE TO FIX TS2305
+export type Hunt = z.infer<typeof HuntSchema>;

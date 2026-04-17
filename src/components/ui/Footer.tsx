@@ -91,7 +91,7 @@ export default function Footer() {
         </div>
 
         {/* BOTTOM ROW: Copyright & Legal */}
-        <div className="pt-8 border-t border-kalahari/10 flex flex-col md:flex-row justify-between items-center text-xs text-off-white/40 font-bold uppercase tracking-widest gap-4">
+        <div className="pt-8 border-t border-kalahari/10 flex flex-col md:flex-row justify-between items-center text-xs text-off-white/40 font-bold uppercase tracking-widest gap-4 mb-6">
           <p>&copy; {currentYear} Only-Hunts. All rights reserved.</p>
           <div className="flex space-x-6">
             <Link 
@@ -107,6 +107,13 @@ export default function Footer() {
               Terms of Service
             </Link>
           </div>
+        </div>
+
+        {/* AI DISCLAIMER ROW */}
+        <div className="text-center pb-2">
+          <p className="text-[10px] text-off-white/30 italic font-medium tracking-wide">
+            *Conceptual imagery on this platform may include AI-generated or synthetic media.
+          </p>
         </div>
 
       </div>

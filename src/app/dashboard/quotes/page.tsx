@@ -32,7 +32,8 @@ export default function HunterQuotesPage() {
         const snapshot = await getDocs(q);
         const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         
-        fetched.sort((a, b) => {
+        // OVERRIDE: Cast to any to bypass strict type checking on createdAt
+        fetched.sort((a: any, b: any) => {
           const dateA = a.createdAt?.toMillis?.() || 0;
           const dateB = b.createdAt?.toMillis?.() || 0;
           return dateB - dateA;

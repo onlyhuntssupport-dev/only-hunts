@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { auth } from "@/lib/firebase/client"; 
 import { initializeSubscription } from "@/app/actions/paystack";
-import { ArrowLeft, CheckCircle2, Shield, Zap, X, Loader2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ShieldCheck, Crosshair, XCircle, Info, Calculator, Search, BadgeCheck, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function OutfitterTiersPage() {
@@ -13,6 +13,7 @@ export default function OutfitterTiersPage() {
   const [error, setError] = useState("");
   const [user, setUser] = useState<{ uid: string; email: string } | null>(null);
 
+  // Auth Bouncer
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((currentUser) => {
       if (currentUser && currentUser.email) {
@@ -24,14 +25,14 @@ export default function OutfitterTiersPage() {
     return () => unsubscribe();
   }, [router]);
 
-  const handleUpgrade = async (tierType: "standard" | "pro") => {
+  // Only handling the PRO upgrade since Standard is the R0 default
+  const handleUpgrade = async () => {
     if (!user) return;
-    setLoadingTier(tierType);
+    setLoadingTier("pro");
     setError("");
 
     try {
-      // NOTE: Your backend action will need to be updated to accept tierType 
-      // to determine if it charges R399 or R799.
+      // NOTE: Ensure your backend action charges R800 ZAR
       const { authorizationUrl } = await initializeSubscription(user.email, user.uid);
       window.location.href = authorizationUrl;
     } catch (err) {
@@ -42,146 +43,189 @@ export default function OutfitterTiersPage() {
   };
 
   return (
-    <div className="min-h-screen bg-off-white dark:bg-stone-950 transition-colors duration-300 pb-20">
+    <div className="min-h-screen bg-stone-50 dark:bg-stone-950 transition-colors duration-300 pb-24">
       
-      {/* Header */}
-      <div className="bg-olive dark:bg-black py-12 md:py-20 border-b-4 border-kalahari relative overflow-hidden text-center">
+      {/* Header Section */}
+      <div className="bg-olive dark:bg-black py-16 border-b-4 border-kalahari relative overflow-hidden text-center">
         <div className="absolute inset-0 opacity-10 bg-[url('/pattern.svg')]"></div>
-        <div className="max-w-4xl mx-auto px-6 relative z-10">
+        <div className="max-w-6xl mx-auto px-6 relative z-10">
           <button 
-            onClick={() => router.push('/outfitter/dashboard')}
-            className="flex items-center text-kalahari hover:text-white text-sm font-bold transition-colors mb-6 mx-auto absolute top-0 left-6"
+            onClick={() => router.back()}
+            className="flex items-center text-kalahari hover:text-white text-sm font-bold transition-colors mb-8 mx-auto"
           >
-            <ArrowLeft className="h-4 w-4 mr-2" /> Back
+            <ArrowLeft className="h-4 w-4 mr-2" /> Back to Dashboard
           </button>
-          
-          <h1 className="text-4xl md:text-6xl font-black font-headline text-white tracking-tight mt-8">
-            Scale Your Safari Business
+          <h1 className="text-4xl md:text-5xl font-black font-headline text-white tracking-tight mb-4">
+            Outfitter Partner Plans
           </h1>
-          <p className="text-off-white/70 mt-4 text-lg md:text-xl font-medium max-w-2xl mx-auto">
-            Choose your outfitter plan to secure premium marketplace placement and powerful business tools.
+          <p className="text-off-white/70 text-lg font-medium max-w-2xl mx-auto">
+            Transparent pricing, clear terms, and no hidden fees. Choose the tier that fits your booking volume and business goals.
           </p>
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-6 mt-12">
+      <div className="max-w-6xl mx-auto px-6 mt-12">
         {error && (
-          <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-8 text-red-800 font-bold flex items-center justify-between">
+          <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 mb-8 text-red-800 dark:text-red-400 font-bold flex items-center justify-between rounded-r-xl max-w-4xl mx-auto">
             {error}
             <button onClick={() => setError("")}><X className="h-5 w-5 text-red-500" /></button>
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+        {/* Pricing Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto items-stretch">
           
-          {/* Standard Tier */}
-          <div className="bg-white dark:bg-stone-900 border-2 border-kalahari/20 rounded-3xl p-8 shadow-sm relative">
-            <h3 className="text-2xl font-black font-headline text-olive dark:text-off-white mb-2">
-              Standard Tier
-            </h3>
-            <p className="text-4xl font-black text-olive/80 dark:text-off-white/80 mb-2">
-              R399<span className="text-lg text-olive/50 dark:text-off-white/50">/month</span>
-            </p>
-            <p className="text-xs font-bold text-olive/50 dark:text-off-white/50 mb-6 uppercase tracking-wider">
-              Cancel Anytime. Essential Tools.
-            </p>
+          {/* TIER 1: STANDARD (FREE) */}
+          <div className="bg-white dark:bg-stone-900 border-2 border-stone-200 dark:border-stone-800 rounded-3xl p-8 shadow-lg flex flex-col relative h-full">
+            <div className="mb-6">
+              <div className="flex items-center gap-3 mb-2">
+                <ShieldCheck className="h-8 w-8 text-green-600 dark:text-green-500" />
+                <h2 className="text-2xl font-black text-stone-900 dark:text-white tracking-tight">Standard</h2>
+              </div>
+              <p className="text-sm font-bold text-stone-500 dark:text-stone-400 uppercase tracking-widest mb-4">Verified Outfitter</p>
+              <div className="flex items-baseline gap-1">
+                <span className="text-4xl font-black text-stone-900 dark:text-white">R0</span>
+                <span className="text-stone-500 dark:text-stone-400 font-bold">/ month</span>
+              </div>
+              <p className="text-sm font-medium text-stone-500 dark:text-stone-400 mt-2">
+                12% Platform Commission per booking.
+              </p>
+            </div>
 
-            <div className="space-y-4 mb-8 bg-slate-50 dark:bg-stone-800/50 p-6 rounded-2xl border border-slate-100 dark:border-stone-800">
-              <div className="flex items-start text-sm font-bold text-olive/80 dark:text-off-white/80">
-                <CheckCircle2 className="h-5 w-5 text-kalahari/50 mr-3 shrink-0" /> 
-                <span>Standard Deposit Commission (12%)</span>
+            <div className="flex-1 space-y-4 mb-8">
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
+                <p className="text-sm font-bold text-stone-700 dark:text-stone-300">Unlimited Hunt Listings</p>
               </div>
-              <div className="flex items-start text-sm font-bold text-olive/80 dark:text-off-white/80">
-                <CheckCircle2 className="h-5 w-5 text-kalahari/50 mr-3 shrink-0" /> 
-                <span>Basic Marketplace Listing</span>
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
+                <p className="text-sm font-bold text-stone-700 dark:text-stone-300">Green 'Verified Permit' Shield</p>
               </div>
-              <div className="flex items-start text-sm font-bold text-olive/80 dark:text-off-white/80">
-                <CheckCircle2 className="h-5 w-5 text-kalahari/50 mr-3 shrink-0" /> 
-                <span>Limited to 5 Active Safaris</span>
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
+                <p className="text-sm font-bold text-stone-700 dark:text-stone-300">Standard Search Visibility</p>
               </div>
-              <div className="flex items-start text-sm font-bold text-olive/40 dark:text-off-white/40">
-                <X className="h-5 w-5 text-olive/30 mr-3 shrink-0" /> 
-                <span className="line-through">No Verified Pro Badge</span>
+              <div className="flex items-start gap-3 opacity-50 pt-2">
+                <XCircle className="h-5 w-5 text-stone-400 shrink-0" />
+                <p className="text-sm font-bold text-stone-500 line-through">Auto-Quote Engine</p>
               </div>
-              <div className="flex items-start text-sm font-bold text-olive/40 dark:text-off-white/40">
-                <X className="h-5 w-5 text-olive/30 mr-3 shrink-0" /> 
-                <span className="line-through">Standard Support</span>
+              <div className="flex items-start gap-3 opacity-50">
+                <XCircle className="h-5 w-5 text-stone-400 shrink-0" />
+                <p className="text-sm font-bold text-stone-500 line-through">Priority Feed Placement</p>
               </div>
             </div>
 
-            <Button 
-              onClick={() => handleUpgrade("standard")}
-              disabled={loadingTier !== null || !user}
-              variant="outline" 
-              className="w-full border-2 border-kalahari/30 text-olive dark:text-off-white hover:bg-kalahari/5 font-black h-14 rounded-xl transition-all"
-            >
-              {loadingTier === "standard" ? (
-                <><Loader2 className="h-6 w-6 animate-spin mr-2" /> Initializing...</>
-              ) : (
-                "Subscribe to Standard"
-              )}
+            <Button variant="outline" className="w-full h-14 text-lg font-black border-2 border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300 mt-auto" disabled>
+              Current Default Plan
             </Button>
           </div>
 
-          {/* Pro Tier (The Target) */}
-          <div className="bg-white dark:bg-stone-900 border-4 border-kalahari rounded-3xl p-8 shadow-2xl relative transform md:-translate-y-4">
-            <div className="absolute top-0 right-8 -translate-y-1/2">
-              <span className="bg-kalahari text-white text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest shadow-md flex items-center gap-1">
-                <Zap className="h-3 w-3 fill-white" /> Recommended
-              </span>
+          {/* TIER 2: ONLY-HUNTS PRO (PAID) */}
+          <div className="bg-stone-950 border-2 border-zinc-800 rounded-3xl p-8 shadow-2xl flex flex-col relative overflow-hidden ring-4 ring-kalahari/20 h-full">
+            <div className="absolute top-0 right-0 bg-kalahari text-white text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-bl-xl">
+              Recommended
             </div>
-
-            <h3 className="text-3xl font-black font-headline text-olive dark:text-off-white mb-2 flex items-center gap-2">
-              Pro Tier <Shield className="h-6 w-6 text-kalahari" />
-            </h3>
-            <p className="text-5xl font-black text-kalahari mb-2">
-              R799<span className="text-xl text-olive/50 dark:text-off-white/50">/month</span>
-            </p>
-            <p className="text-xs font-bold text-olive/50 dark:text-off-white/50 mb-6 uppercase tracking-wider">
-              Cancel Anytime. No Hidden Fees.
-            </p>
-
-            <div className="space-y-4 mb-8 bg-kalahari/5 p-6 rounded-2xl border border-kalahari/20">
-              <div className="flex items-start text-sm font-black text-olive dark:text-off-white">
-                <CheckCircle2 className="h-5 w-5 text-kalahari mr-3 shrink-0" /> 
-                <span>Reduced Deposit Commission (8%)</span>
-              </div>
-              <div className="flex items-start text-sm font-black text-olive dark:text-off-white">
-                <CheckCircle2 className="h-5 w-5 text-kalahari mr-3 shrink-0" /> 
-                <span>Priority Search Placement (Rank Higher)</span>
-              </div>
-              <div className="flex items-start text-sm font-black text-olive dark:text-off-white">
-                <CheckCircle2 className="h-5 w-5 text-kalahari mr-3 shrink-0" /> 
-                <span>Unlimited Active Safari Listings</span>
-              </div>
-              <div className="flex items-start text-sm font-black text-olive dark:text-off-white">
-                <CheckCircle2 className="h-5 w-5 text-kalahari mr-3 shrink-0" /> 
-                <span>Gold Verified Pro Badge on Profile</span>
-              </div>
-              <div className="flex items-start text-sm font-black text-olive dark:text-off-white">
-                <CheckCircle2 className="h-5 w-5 text-kalahari mr-3 shrink-0" /> 
-                <span>Priority 24/7 Platform Support</span>
-              </div>
-            </div>
-
-            <Button 
-              onClick={() => handleUpgrade("pro")}
-              disabled={loadingTier !== null || !user}
-              className="w-full bg-kalahari text-white hover:bg-kalahari/90 font-black h-14 rounded-xl shadow-lg transition-transform hover:scale-[1.02] text-lg"
-            >
-              {loadingTier === "pro" ? (
-                <><Loader2 className="h-6 w-6 animate-spin mr-2" /> Initializing Checkout...</>
-              ) : (
-                "Upgrade to Pro"
-              )}
-            </Button>
             
-            <p className="text-center text-[10px] font-bold text-olive/40 dark:text-off-white/40 mt-4 uppercase tracking-widest">
-              Secured locally by Paystack
-            </p>
+            <div className="mb-6 relative z-10">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="bg-zinc-800 p-1.5 rounded-lg border border-zinc-700 shadow-inner">
+                  <Crosshair className="h-6 w-6 text-zinc-300" />
+                </div>
+                <h2 className="text-2xl font-black text-white tracking-tight">Only-Hunts <span className="bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded text-xl border border-zinc-700 ml-1">PRO</span></h2>
+              </div>
+              <p className="text-sm font-bold text-kalahari uppercase tracking-widest mb-4">Apex Visibility & Automation</p>
+              <div className="flex items-baseline gap-1">
+                <span className="text-4xl font-black text-white">R800</span>
+                <span className="text-zinc-400 font-bold">/ month</span>
+              </div>
+              <p className="text-sm font-medium text-zinc-400 mt-2 flex items-center gap-2">
+                Reduced 8% Platform Commission.
+              </p>
+            </div>
+
+            <div className="flex-1 space-y-4 mb-8 relative z-10">
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="h-5 w-5 text-kalahari shrink-0 mt-0.5" />
+                <p className="text-sm font-bold text-zinc-200">Everything in Standard</p>
+              </div>
+              <div className="flex items-start gap-3 bg-zinc-900/50 p-3 rounded-xl border border-zinc-800/50">
+                <Calculator className="h-5 w-5 text-kalahari shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-bold text-white">Auto-Quote Engine Unlocked</p>
+                  <p className="text-xs text-zinc-400 font-medium mt-1">Platform automatically generates bespoke financial proposals for hunters based on your pricing matrix.</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 bg-zinc-900/50 p-3 rounded-xl border border-zinc-800/50">
+                <Search className="h-5 w-5 text-kalahari shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-bold text-white">Priority Search Algorithm</p>
+                  <p className="text-xs text-zinc-400 font-medium mt-1">Your listings are pushed to the top block of the hunter search feed above standard outfitters.</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 bg-zinc-900/50 p-3 rounded-xl border border-zinc-800/50">
+                <BadgeCheck className="h-5 w-5 text-zinc-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-bold text-white">Onyx PRO Pill</p>
+                  <p className="text-xs text-zinc-400 font-medium mt-1">Exclusive visual tag displayed next to your name indicating premium status to hunters.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-auto relative z-10">
+              <Button 
+                onClick={handleUpgrade}
+                disabled={loadingTier !== null || !user}
+                className="w-full h-14 text-lg font-black bg-kalahari hover:bg-kalahari/90 text-white shadow-[0_0_20px_rgba(209,164,123,0.3)] transition-all"
+              >
+                {loadingTier === "pro" ? (
+                  <><Loader2 className="h-6 w-6 animate-spin mr-2" /> Initializing Checkout...</>
+                ) : (
+                  "Upgrade to PRO"
+                )}
+              </Button>
+              <p className="text-center text-[10px] font-bold text-zinc-600 mt-3 uppercase tracking-widest">
+                Secured locally by Paystack
+              </p>
+            </div>
           </div>
 
         </div>
+
+        {/* Feature & Terms Clarity (The "No Legal BS" Section) */}
+        <div className="max-w-4xl mx-auto mt-16 bg-white dark:bg-stone-900 border-2 border-stone-200 dark:border-stone-800 rounded-3xl p-8 shadow-sm">
+          <div className="flex items-center gap-3 mb-6 border-b border-stone-200 dark:border-stone-800 pb-4">
+            <Info className="h-6 w-6 text-kalahari" />
+            <h3 className="text-xl font-black text-stone-900 dark:text-white tracking-tight">Feature Mechanics & Legal Clarity</h3>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div>
+              <h4 className="font-black text-stone-900 dark:text-white mb-2 text-sm uppercase tracking-wider">1. Commission Deductions</h4>
+              <p className="text-sm text-stone-600 dark:text-stone-400 font-medium leading-relaxed">
+                Whether you are on the 12% Standard plan or the 8% PRO plan, the Only-Hunts platform commission is automatically deducted exclusively from the hunter's upfront deposit via our payment gateway. You are responsible for collecting the remaining balance directly from the hunter upon arrival. You will never be invoiced post-hunt.
+              </p>
+            </div>
+            <div>
+              <h4 className="font-black text-stone-900 dark:text-white mb-2 text-sm uppercase tracking-wider">2. Randomized Priority Search</h4>
+              <p className="text-sm text-stone-600 dark:text-stone-400 font-medium leading-relaxed">
+                To guarantee fairness and prevent monopolies, PRO outfitters do not buy a fixed #1 spot. Instead, all matching PRO listings are grouped at the top of the search feed, and their order is randomized every time a hunter refreshes the page. Standard listings appear below the PRO block.
+              </p>
+            </div>
+            <div>
+              <h4 className="font-black text-stone-900 dark:text-white mb-2 text-sm uppercase tracking-wider">3. The Verified vs. PRO Badge</h4>
+              <p className="text-sm text-stone-600 dark:text-stone-400 font-medium leading-relaxed">
+                The <strong className="text-green-600 dark:text-green-500">Green Verified Shield</strong> indicates that our administrative team has successfully vetted your professional outfitter permits. It is an industry compliance marker available to all tiers. The <strong className="text-zinc-500 dark:text-zinc-300">Onyx PRO Pill</strong> is a distinct software tag indicating your active subscription to our premium tier.
+              </p>
+            </div>
+            <div>
+              <h4 className="font-black text-stone-900 dark:text-white mb-2 text-sm uppercase tracking-wider">4. Subscription Cancellations</h4>
+              <p className="text-sm text-stone-600 dark:text-stone-400 font-medium leading-relaxed">
+                You may cancel your R800/month PRO subscription at any time. Upon cancellation, you will retain PRO benefits until the end of your current billing cycle. Afterward, your account will automatically downgrade to the Standard (Free) tier, your commission rate will revert to 12%, and the Auto-Quote Engine will be disabled.
+              </p>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   );

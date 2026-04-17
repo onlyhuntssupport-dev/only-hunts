@@ -5,7 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { auth, db } from '@/lib/firebase/client';
 import { doc, getDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
-import { Shield, Store, Users, Activity, Wallet, Inbox, Loader2 } from 'lucide-react';
+import { Shield, Store, Users, Activity, Wallet, Inbox, Loader2, BarChart } from 'lucide-react';
 
 const navLinks = [
   { href: '/admin', label: 'Staff / Team', icon: Shield },
@@ -13,8 +13,8 @@ const navLinks = [
   { href: '/admin/hunters', label: 'Hunters', icon: Users },
   { href: '/admin/pipeline', label: 'Quote Flow', icon: Activity },
   { href: '/admin/accounting', label: 'Accounting', icon: Wallet },
-  // FIX: Updated href to match the actual file path we just created
   { href: '/admin/support', label: 'Support Inbox', icon: Inbox, isSupport: true }, 
+  { href: '/admin/traffic', label: 'Traffic Analytics', icon: BarChart }, 
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -23,13 +23,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [loading, setLoading] = useState(true);
   
-  // NEW: State to track open tickets globally
   const [openTicketsCount, setOpenTicketsCount] = useState(0);
 
-  // Authentication & Authorization Listener
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      // FIX: Ensure loading state is killed even if they are redirected
       if (!user) {
+        setLoading(false); 
         router.replace('/login');
         return;
       }
@@ -51,6 +51,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         console.error("Admin layout auth error:", error);
         router.replace('/login');
       } finally {
+        // This only fires if the try/catch block actually runs
         setLoading(false);
       }
     });
@@ -58,9 +59,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return () => unsubscribe();
   }, [router]);
 
-  // NEW: Real-time Ticket Counter Listener
   useEffect(() => {
-    // Only fetch tickets if they are a confirmed admin
     if (!isAuthorized) return;
 
     const q = query(
@@ -90,10 +89,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <div className="flex h-screen bg-off-white dark:bg-stone-950 overflow-hidden transition-colors">
       
-      {/* UNIFIED DESKTOP SIDEBAR */}
       <aside className="w-20 lg:w-64 border-r-2 border-kalahari/20 bg-white dark:bg-stone-900 hidden md:flex flex-col transition-all z-20">
         
-        {/* Brand Logo Header */}
         <Link href="/" className="p-6 border-b-2 border-kalahari/10 flex items-center gap-3 hover:opacity-80 transition-opacity">
           <div className="h-10 w-10 bg-kalahari rounded-xl flex items-center justify-center text-white font-black shrink-0">
             OH
@@ -103,7 +100,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </span>
         </Link>
         
-        {/* Navigation Map */}
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
           {navLinks.map(link => {
             const isActive = pathname === link.href;
@@ -120,7 +116,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               >
                 <div className="relative">
                   <link.icon className="h-5 w-5 shrink-0" />
-                  {/* MOBILE BADGE (When sidebar is collapsed) */}
                   {link.isSupport && openTicketsCount > 0 && (
                     <span className="absolute -top-1 -right-1 flex h-3 w-3 lg:hidden">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
@@ -129,7 +124,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   )}
                 </div>
                 
-                {/* DESKTOP LABEL & BADGE */}
                 <span className="hidden lg:flex items-center justify-between flex-1">
                   {link.label}
                   {link.isSupport && openTicketsCount > 0 && (
@@ -144,7 +138,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </nav>
       </aside>
 
-      {/* DYNAMIC PAGE CONTENT */}
       <main className="flex-1 flex flex-col relative overflow-y-auto">
         {children}
       </main>

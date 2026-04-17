@@ -8,7 +8,6 @@ import { auth, db } from "@/lib/firebase/client";
 import { doc, getDoc, collection, query, where, onSnapshot } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import { Button } from "@/components/ui/button";
-// FIX: Imported the Briefcase icon
 import { LogOut, LayoutDashboard, Loader2, Compass, User, MessageSquare, Heart, Settings, ChevronDown, Briefcase } from "lucide-react";
 import SupportModal from "@/components/support/SupportModal";
 
@@ -59,16 +58,25 @@ export default function Navbar() {
           const chatsRef = collection(db, "chats");
           const q = query(chatsRef, where("participants", "array-contains", currentUser.uid));
           
-          unsubscribeMessagesRef.current = onSnapshot(q, (snapshot) => {
-            let hasUnread = false;
-            snapshot.docs.forEach((doc) => {
-              const data = doc.data();
-              if (data.unreadCount && data.unreadCount[currentUser.uid] > 0) {
-                hasUnread = true;
+          unsubscribeMessagesRef.current = onSnapshot(q, 
+            (snapshot) => {
+              let hasUnread = false;
+              snapshot.docs.forEach((doc) => {
+                const data = doc.data();
+                if (data.unreadCount && data.unreadCount[currentUser.uid] > 0) {
+                  hasUnread = true;
+                }
+              });
+              setHasUnreadMessages(hasUnread);
+            }, 
+            (error: any) => {
+              if (error.code === 'permission-denied') {
+                console.log("Waiting for database security rules to sync...");
+              } else {
+                console.error("Messages snapshot error:", error);
               }
-            });
-            setHasUnreadMessages(hasUnread);
-          });
+            }
+          );
 
         } catch (err) {
           console.error("Error fetching user data:", err);
@@ -103,8 +111,17 @@ export default function Navbar() {
       unsubscribeMessagesRef.current = null;
     }
     
-    await signOut(auth);
-    router.push("/");
+    try {
+      await fetch('/api/auth/session', { method: 'DELETE' }).catch(() => {});
+      router.push("/");
+
+      setTimeout(async () => {
+        await signOut(auth);
+      }, 150);
+      
+    } catch (error) {
+      console.error("Error during sign out:", error);
+    }
   };
 
   const handleDashboardClick = () => {
@@ -152,11 +169,11 @@ export default function Navbar() {
             
             {!isDashboard && (
               <>
-                <Link href="/marketplace">
-                  <Button variant="ghost" className="text-olive dark:text-off-white dark:text-kalahari font-bold hover:bg-kalahari/10 hover:text-olive dark:text-off-white dark:hover:text-off-white text-sm sm:text-base flex px-2 sm:px-4 transition-colors">
+                <Button asChild variant="ghost" className="text-olive dark:text-off-white dark:text-kalahari font-bold hover:bg-kalahari/10 hover:text-olive dark:text-off-white dark:hover:text-off-white text-sm sm:text-base flex px-2 sm:px-4 transition-colors">
+                  <Link href="/marketplace">
                     <Compass className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Marketplace</span>
-                  </Button>
-                </Link>
+                  </Link>
+                </Button>
                 {!isAuthPage && <div className="h-6 w-px bg-kalahari/30 mx-1 sm:mx-2 hidden sm:block"></div>}
               </>
             )}
@@ -240,7 +257,6 @@ export default function Navbar() {
                               <MessageSquare className="h-4 w-4 mr-3 text-kalahari" /> Messages
                             </Link>
 
-                            {/* FIX: Replaced with Briefcase and clear text */}
                             {role === "OUTFITTER" ? (
                               <Link 
                                 href="/outfitter/billing" 
@@ -292,16 +308,16 @@ export default function Navbar() {
 
                 ) : (
                   <>
-                    <Link href="/login">
-                      <Button variant="ghost" className="text-olive dark:text-off-white dark:text-kalahari font-bold hover:bg-kalahari/10 transition-colors">
+                    <Button asChild variant="ghost" className="text-olive dark:text-off-white dark:text-kalahari font-bold hover:bg-kalahari/10 transition-colors">
+                      <Link href="/login">
                         Sign In
-                      </Button>
-                    </Link>
-                    <Link href="/signup">
-                      <Button className="bg-olive dark:bg-kalahari hover:bg-olive/90 dark:hover:bg-kalahari/90 text-kalahari dark:text-olive dark:text-off-white font-black shadow-md transition-colors">
+                      </Link>
+                    </Button>
+                    <Button asChild className="bg-olive dark:bg-kalahari hover:bg-olive/90 dark:hover:bg-kalahari/90 text-kalahari dark:text-olive dark:text-off-white font-black shadow-md transition-colors">
+                      <Link href="/signup">
                         Sign Up
-                      </Button>
-                    </Link>
+                      </Link>
+                    </Button>
                   </>
                 )}
               </>

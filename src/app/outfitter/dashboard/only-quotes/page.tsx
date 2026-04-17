@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { savePricingMatrix } from "@/lib/firebase/onlyQuotesService";
 import { auth, db } from "@/lib/firebase/client";
 import { doc, getDoc } from "firebase/firestore";
@@ -31,6 +32,7 @@ const MASTER_SPECIES_LIST = [
 ];
 
 export default function OnlyQuotesSetupPage() {
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -71,11 +73,32 @@ export default function OnlyQuotesSetupPage() {
   const [zarInput, setZarInput] = useState("");
   const exchangeRate = 18.5;
 
-  // --- HYDRATION: FETCH EXISTING DATA ON LOAD ---
+  // --- HYDRATION: FETCH EXISTING DATA AND ENFORCE HARD LOCK ON LOAD ---
   useEffect(() => {
-    const fetchMatrix = async (user: any) => {
+    const initializePage = async (user: any) => {
       try {
-        // Path aligned perfectly with the service file's architecture
+        // 1. HARD LOCK CHECK: Fetch outfitter profile to verify tier
+        const outfitterRef = doc(db, 'outfitters', user.uid);
+        const outfitterSnap = await getDoc(outfitterRef);
+        const userRef = doc(db, 'users', user.uid);
+        const userSnap = await getDoc(userRef);
+
+        let isPro = false;
+        if (outfitterSnap.exists()) {
+          const tier = outfitterSnap.data().tier;
+          if (tier === "pro" || tier === "PRO") isPro = true;
+        }
+        if (userSnap.exists() && userSnap.data().isPremium) {
+          isPro = true;
+        }
+
+        // If they are not Pro, instantly bounce them to billing
+        if (!isPro) {
+          router.replace("/outfitter/billing");
+          return; // Stop execution of the rest of the function
+        }
+
+        // 2. Fetch the actual matrix data if they are authorized
         const docRef = doc(db, 'outfitters', user.uid, 'documents', 'pricing_matrix');
         const docSnap = await getDoc(docRef);
 
@@ -99,7 +122,7 @@ export default function OnlyQuotesSetupPage() {
           if (data.policies) setPolicies(data.policies);
         }
       } catch (error) {
-        console.error("Error fetching pricing matrix:", error);
+        console.error("Error initializing page:", error);
       } finally {
         setIsLoading(false);
       }
@@ -107,14 +130,14 @@ export default function OnlyQuotesSetupPage() {
 
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
-        fetchMatrix(user);
+        initializePage(user);
       } else {
-        setIsLoading(false);
+        router.replace("/login"); // Bounce unauthenticated users too
       }
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [router]);
 
   const handlePriceChange = (id: string, value: string) => {
     const num = parseInt(value) || 0;
@@ -176,7 +199,7 @@ export default function OnlyQuotesSetupPage() {
         policies
       };
 
-      const result = await savePricingMatrix(auth.currentUser.uid, payload);
+      const result = await savePricingMatrix(auth.currentUser.uid, payload as any);
       
       if (result.success) {
         setSaveSuccess(true);

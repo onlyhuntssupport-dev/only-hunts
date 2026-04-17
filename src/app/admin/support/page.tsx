@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { db } from "@/lib/firebase/client";
-import { collection, query, orderBy, onSnapshot, doc, updateDoc } from "firebase/firestore";
+import { useRouter } from "next/navigation";
+import { auth, db } from "@/lib/firebase/client";
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, getDocs, where, addDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { 
   AlertTriangle, ShieldAlert, Wrench, CheckCircle, 
-  Clock, ChevronDown, ChevronUp, Mail, User, Shield, Archive 
+  Clock, ChevronDown, ChevronUp, Mail, User, Shield, Archive, Trash2, MessageSquare, Loader2 
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
@@ -16,17 +17,18 @@ interface SupportTicket {
   userName: string;
   userEmail: string;
   userRole: string;
-  category: "BOOKING_ISSUE" | "SAFETY_CONCERN" | "TECH_ISSUE";
+  category: "BOOKING_ISSUE" | "SAFETY_CONCERN" | "TECH_ISSUE" | string;
   message: string;
-  // FIX: Added ARCHIVED to the allowed status types
   status: "OPEN" | "RESOLVED" | "ARCHIVED";
-  createdAt: string;
+  createdAt: any; 
 }
 
 export default function AdminSupportPage() {
+  const router = useRouter();
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [startingChatId, setStartingChatId] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -59,7 +61,6 @@ export default function AdminSupportPage() {
     }
   };
 
-  // NEW: Archive Function (Soft Delete)
   const archiveTicket = async (ticketId: string) => {
     if (!window.confirm("Are you sure you want to archive this ticket? It will be removed from this view.")) return;
     
@@ -72,7 +73,89 @@ export default function AdminSupportPage() {
     }
   };
 
-  const getCategoryDetails = (category: string) => {
+  const deleteTicket = async (ticketId: string) => {
+    if (!window.confirm("Are you sure you want to PERMANENTLY delete this ticket? This cannot be undone.")) return;
+    
+    try {
+      await deleteDoc(doc(db, "supportTickets", ticketId));
+      toast({ title: "Ticket Deleted", description: "Ticket permanently removed from database." });
+      setExpandedId(null);
+    } catch (error) {
+      toast({ title: "Error", description: "Could not delete ticket.", variant: "destructive" });
+    }
+  };
+
+  // NEW: Advanced routing function to bridge Support Tickets and the Messaging App
+  const handleStartChat = async (ticket: SupportTicket) => {
+    try {
+      setStartingChatId(ticket.id);
+      const adminId = auth.currentUser?.uid;
+      
+      if (!adminId) {
+        toast({ title: "Error", description: "You must be authenticated.", variant: "destructive" });
+        setStartingChatId(null);
+        return;
+      }
+
+      // 1. AUTO-RESOLVE TICKET TO CLEAR NOTIFICATION BADGE
+      await updateDoc(doc(db, "supportTickets", ticket.id), { status: "RESOLVED" }).catch((err) => {
+          console.error("Could not auto-resolve ticket:", err);
+      });
+
+      // 2. Check if an admin chat already exists for this specific user to prevent duplicates
+      const chatsRef = collection(db, "chats");
+      const q = query(
+        chatsRef,
+        where("type", "==", "ADMIN_SUPPORT"),
+        where("participants", "array-contains", ticket.userId)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      let targetChatId = null;
+
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.participants.includes(adminId)) {
+          targetChatId = doc.id;
+        }
+      });
+
+      // 3. If no active chat exists, generate a new one
+      if (!targetChatId) {
+        const newChat = await addDoc(collection(db, "chats"), {
+          type: "ADMIN_SUPPORT",
+          participants: [ticket.userId, adminId],
+          hunterName: ticket.userName || "User", 
+          huntTitle: `Platform Support`,
+          lastMessage: "Admin joined the chat",
+          updatedAt: new Date().toISOString(),
+          unreadCount: {
+            [ticket.userId]: 1,
+            [adminId]: 0
+          }
+        });
+        targetChatId = newChat.id;
+
+        // Inject an automated system message for context
+        await addDoc(collection(db, "chats", targetChatId, "messages"), {
+          senderId: "SYSTEM",
+          text: `Admin initiated support chat regarding: ${ticket.category ? ticket.category.replace('_', ' ') : 'General Inquiry'}`,
+          createdAt: new Date().toISOString()
+        });
+      }
+
+      // 4. Navigate the admin directly into the chat room
+      toast({ title: "Chat Started", description: "Redirecting to secure messaging..." });
+      router.push(`/messages/${targetChatId}`);
+      
+    } catch (error) {
+      console.error("Error starting chat:", error);
+      toast({ title: "Error", description: "Could not start message thread.", variant: "destructive" });
+      setStartingChatId(null);
+    }
+  };
+
+  const getCategoryDetails = (category: string | undefined) => {
     switch (category) {
       case "BOOKING_ISSUE": return { icon: AlertTriangle, label: "Booking/Quote", color: "text-orange-600 bg-orange-100 dark:text-orange-400 dark:bg-orange-900/30 border-orange-200 dark:border-orange-900/50" };
       case "SAFETY_CONCERN": return { icon: ShieldAlert, label: "Safety/Report", color: "text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30 border-red-200 dark:border-red-900/50" };
@@ -81,9 +164,20 @@ export default function AdminSupportPage() {
     }
   };
 
+  const formatTicketDate = (dateData: any) => {
+    if (!dateData) return "Unknown time";
+    try {
+      if (typeof dateData.toDate === 'function') {
+        return formatDistanceToNow(dateData.toDate(), { addSuffix: true });
+      }
+      return formatDistanceToNow(new Date(dateData), { addSuffix: true });
+    } catch (e) {
+      return "Invalid date";
+    }
+  };
+
   if (loading) return <div className="p-8 text-center font-bold">Loading secure inbox...</div>;
 
-  // FIX: Filter out ARCHIVED tickets so they disappear from the UI
   const visibleTickets = tickets.filter(t => t.status !== "ARCHIVED");
   const openTickets = visibleTickets.filter(t => t.status === "OPEN");
   const resolvedTickets = visibleTickets.filter(t => t.status === "RESOLVED");
@@ -128,12 +222,12 @@ export default function AdminSupportPage() {
                     <div className={`p-3 rounded-lg border shrink-0 ${cat.color}`}><Icon className="h-5 w-5" /></div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <h3 className={`font-black truncate ${ticket.status === "RESOLVED" ? "line-through text-olive/50" : "text-olive dark:text-off-white"}`}>{ticket.userName}</h3>
-                        <span className="text-xs font-bold px-2 py-0.5 bg-kalahari/10 text-olive/70 rounded-md">{ticket.userRole}</span>
+                        <h3 className={`font-black truncate ${ticket.status === "RESOLVED" ? "line-through text-olive/50" : "text-olive dark:text-off-white"}`}>{ticket.userName || 'Unknown User'}</h3>
+                        <span className="text-xs font-bold px-2 py-0.5 bg-kalahari/10 text-olive/70 rounded-md">{ticket.userRole || 'UNKNOWN'}</span>
                       </div>
                       <p className="text-sm text-olive/60 font-medium flex items-center gap-1.5 mt-0.5">
                         <Clock className="h-3.5 w-3.5" />
-                        {ticket.createdAt ? formatDistanceToNow(new Date(ticket.createdAt), { addSuffix: true }) : "Unknown time"}
+                        {formatTicketDate(ticket.createdAt)}
                       </p>
                     </div>
                   </div>
@@ -150,7 +244,7 @@ export default function AdminSupportPage() {
                       <div className="md:col-span-2 space-y-3">
                         <h4 className="text-xs font-black text-olive/50 uppercase tracking-widest">Message Payload</h4>
                         <div className="p-4 bg-white dark:bg-stone-900 border border-kalahari/10 rounded-xl">
-                          <p className="text-sm font-medium text-olive dark:text-off-white whitespace-pre-wrap leading-relaxed">{ticket.message}</p>
+                          <p className="text-sm font-medium text-olive dark:text-off-white whitespace-pre-wrap leading-relaxed">{ticket.message || 'No message provided.'}</p>
                         </div>
                       </div>
 
@@ -160,23 +254,32 @@ export default function AdminSupportPage() {
                           <div className="p-4 bg-white dark:bg-stone-900 border border-kalahari/10 rounded-xl space-y-3">
                             <div className="flex items-center gap-2 text-sm text-olive/80 font-medium overflow-hidden">
                               <User className="h-4 w-4 shrink-0 text-kalahari" />
-                              <span className="truncate">{ticket.userName}</span>
+                              <span className="truncate">{ticket.userName || 'Unknown User'}</span>
                             </div>
                             <div className="flex items-center gap-2 text-sm text-olive/80 font-medium overflow-hidden">
                               <Mail className="h-4 w-4 shrink-0 text-kalahari" />
-                              <span className="truncate">{ticket.userEmail}</span>
+                              <span className="truncate">{ticket.userEmail || 'No email provided'}</span>
                             </div>
                             <div className="flex items-center gap-2 text-sm text-olive/80 font-medium overflow-hidden">
                               <Shield className="h-4 w-4 shrink-0 text-kalahari" />
-                              <span className="truncate font-mono text-xs">{ticket.userId}</span>
+                              <span className="truncate font-mono text-xs">{ticket.userId || 'Unknown ID'}</span>
                             </div>
                           </div>
                         </div>
 
-                        {/* NEW: Admin Action Buttons */}
                         <div className="flex flex-col gap-2">
+                          
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleStartChat(ticket); }}
+                            disabled={startingChatId === ticket.id}
+                            className="w-full py-3 px-4 rounded-xl font-black text-sm flex justify-center items-center gap-2 transition-all shadow-sm bg-kalahari text-white hover:bg-kalahari/90 disabled:opacity-70"
+                          >
+                            {startingChatId === ticket.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquare className="h-4 w-4" />}
+                            Reply via Message
+                          </button>
+
                           <a 
-                            href={`mailto:${ticket.userEmail}?subject=Only-Hunts Support: ${ticket.category.replace('_', ' ')}`}
+                            href={`mailto:${ticket.userEmail || ''}?subject=Only-Hunts Support: ${ticket.category ? ticket.category.replace('_', ' ') : 'General Inquiry'}`}
                             className="w-full py-3 px-4 rounded-xl font-black text-sm flex justify-center items-center gap-2 transition-all shadow-sm bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100"
                           >
                             <Mail className="h-4 w-4" /> Reply via Email
@@ -191,14 +294,21 @@ export default function AdminSupportPage() {
                             {ticket.status === "OPEN" ? <><CheckCircle className="h-5 w-5" /> Mark as Resolved</> : "Reopen Ticket"}
                           </button>
 
-                          {ticket.status === "RESOLVED" && (
+                          <div className="grid grid-cols-2 gap-2 mt-1">
                             <button
                               onClick={(e) => { e.stopPropagation(); archiveTicket(ticket.id); }}
-                              className="w-full py-3 px-4 rounded-xl font-black text-sm flex justify-center items-center gap-2 transition-all shadow-sm bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 mt-2"
+                              className="w-full py-3 px-2 rounded-xl font-black text-sm flex justify-center items-center gap-1.5 transition-all shadow-sm bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200 dark:bg-stone-800 dark:text-stone-300 dark:border-stone-700 dark:hover:bg-stone-700"
                             >
-                              <Archive className="h-4 w-4" /> Archive Ticket
+                              <Archive className="h-4 w-4" /> Archive
                             </button>
-                          )}
+                            
+                            <button
+                              onClick={(e) => { e.stopPropagation(); deleteTicket(ticket.id); }}
+                              className="w-full py-3 px-2 rounded-xl font-black text-sm flex justify-center items-center gap-1.5 transition-all shadow-sm bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 dark:bg-red-900/20 dark:border-red-900/50 dark:hover:bg-red-900/40"
+                            >
+                              <Trash2 className="h-4 w-4" /> Delete
+                            </button>
+                          </div>
                         </div>
                       </div>
 

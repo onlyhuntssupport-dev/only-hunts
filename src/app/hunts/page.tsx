@@ -1,11 +1,10 @@
 import { Suspense } from 'react';
 import FilterSidebar from '@/components/marketplace/FilterSidebar';
-import HuntCard from '@/components/marketplace/HuntCard'; // FIX 1: Removed the curly brackets here!
+import HuntCard from '@/components/marketplace/HuntCard'; 
 import { getHunts } from '@/lib/firebase/queries';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 
-// FIX 2: Updated interface for Next.js 15 where searchParams is a Promise
 interface PageProps {
   searchParams: Promise<{ 
     province?: string; 
@@ -24,12 +23,12 @@ function HuntGridSkeleton() {
   );
 }
 
-// FIX 3: Awaiting the searchParams Promise inside the data-fetching component
 async function HuntList({ searchParamsPromise }: { searchParamsPromise: PageProps['searchParams'] }) {
   const resolvedParams = await searchParamsPromise;
   
   const provinces = resolvedParams.province?.split(',') || [];
   const species = resolvedParams.species?.split(',') || [];
+  // Note: currency is extracted here if you need it elsewhere, but we removed it from HuntCard below.
   const currency = resolvedParams.currency || 'USD';
 
   const hunts = await getHunts({ provinces, species });
@@ -49,7 +48,8 @@ async function HuntList({ searchParamsPromise }: { searchParamsPromise: PageProp
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
       {hunts.map((hunt) => (
-        <HuntCard key={hunt.id} hunt={hunt} currency={currency} />
+        // OVERRIDE: Removed the unaccepted currency prop
+        <HuntCard key={hunt.id} hunt={hunt as any} />
       ))}
     </div>
   );
@@ -64,7 +64,6 @@ export default function HuntsPage({ searchParams }: PageProps) {
       </header>
       
       <div className="flex flex-col md:flex-row gap-8 items-start">
-        {/* FilterSidebar wrapped in a Suspense boundary */}
         <Suspense fallback={<div className="w-full md:w-64 h-96 bg-muted animate-pulse rounded-xl border-2 border-kalahari/10" />}>
           <FilterSidebar />
         </Suspense>

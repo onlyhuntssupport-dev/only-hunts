@@ -1,12 +1,14 @@
-
 import { 
   collection, 
   query, 
   where, 
   getDocs, 
-  orderBy
+  orderBy,
+  doc,
+  getDoc
 } from 'firebase/firestore';
-import { adminDb } from './admin';
+// OVERRIDE: Import db from client, not adminDb
+import { db } from './client';
 import { huntConverter } from './converters';
 import { Hunt } from '../validations/hunt';
 
@@ -26,7 +28,8 @@ export async function getHunts({
   limitCount = 30
 }: FetchHuntsParams): Promise<Hunt[]> {
   try {
-    const huntsRef = collection(adminDb, 'hunts').withConverter(huntConverter);
+    // OVERRIDE: Swapped adminDb to db
+    const huntsRef = collection(db, 'hunts').withConverter(huntConverter);
     
     // Base query only fetching verified and active hunts
     const queryConstraints: any[] = [
@@ -45,19 +48,49 @@ export async function getHunts({
     
     let hunts = querySnapshot.docs.map(doc => doc.data());
 
-    // Client-side filter for species, since Firestore doesn't support 'array-contains-any' efficiently for this scale.
-    // This is a common and acceptable pattern for secondary filtering.
+    // Client-side filter for species
     if (species.length > 0) {
       hunts = hunts.filter(hunt => 
-        hunt.species.some(s => species.includes(s))
+        hunt.species?.some(s => species.includes(s))
       );
     }
     
-    return hunts.slice(0, limitCount);
+    // --- NEW: PREMIUM ALGORITHM ENGINE ---
+    // Fetch outfitter profiles to check Premium status and inject it into the hunt data
+    const outfitterCache = new Map<string, boolean>();
+    
+    const enrichedHunts = await Promise.all(hunts.map(async (hunt: any) => {
+      let isPremium = false;
+      if (hunt.outfitterId) {
+        if (outfitterCache.has(hunt.outfitterId)) {
+          isPremium = outfitterCache.get(hunt.outfitterId)!;
+        } else {
+          try {
+            const outfitterDoc = await getDoc(doc(db, 'users', hunt.outfitterId));
+            if (outfitterDoc.exists()) {
+              isPremium = outfitterDoc.data().isPremium === true;
+            }
+            outfitterCache.set(hunt.outfitterId, isPremium);
+          } catch (e) {
+            console.error("Failed to fetch outfitter status", e);
+            outfitterCache.set(hunt.outfitterId, false);
+          }
+        }
+      }
+      return { ...hunt, outfitterIsPremium: isPremium };
+    }));
+
+    // Sort: Premium listings first, maintaining chronological order as a secondary sort
+    enrichedHunts.sort((a, b) => {
+      if (a.outfitterIsPremium && !b.outfitterIsPremium) return -1;
+      if (!a.outfitterIsPremium && b.outfitterIsPremium) return 1;
+      return 0; 
+    });
+
+    return enrichedHunts.slice(0, limitCount) as Hunt[];
 
   } catch (error) {
     console.error("Error fetching hunts:", error);
-    // In a real app, you might want to log this to a monitoring service.
     return [];
   }
 }

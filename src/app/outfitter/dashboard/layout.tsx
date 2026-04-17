@@ -12,12 +12,12 @@ import KuduLoader from '@/components/ui/KuduLoader';
 import { NotificationPrompt } from "@/components/ui/NotificationPrompt";
 import SupportModal from '@/components/support/SupportModal';
 
-// We added a special flag (isCustomLogo) for the Only-Hunts Profile link
+// FIX: Updated the label to "Public Profile" and the href to point to the edit page
 const navLinks = [
   { href: "/outfitter/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/outfitter/dashboard/hunts", label: "My Hunts", icon: Package },
   { href: "/outfitter/dashboard/leads", label: "Inquiries", icon: Users },
-  { href: "/outfitter/dashboard/settings", label: "Only-Hunts Profile", isCustomLogo: true }, 
+  { href: "/profile/edit", label: "Public Profile", isCustomLogo: true }, 
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode; }) {
