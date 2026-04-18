@@ -113,12 +113,8 @@ export default function Navbar() {
     
     try {
       await fetch('/api/auth/session', { method: 'DELETE' }).catch(() => {});
-      router.push("/");
-
-      setTimeout(async () => {
-        await signOut(auth);
-      }, 150);
-      
+      await signOut(auth);
+      router.replace("/login");
     } catch (error) {
       console.error("Error during sign out:", error);
     }

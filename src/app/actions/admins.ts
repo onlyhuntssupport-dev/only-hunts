@@ -393,7 +393,7 @@ export async function getFinancialLedger() {
 }
 
 // ============================================================================
-// 6. THE NUKE COMMAND (Permanent Deletion)
+// 6. THE NUKE COMMANDS (Permanent Deletion)
 // ============================================================================
 
 export async function nukeOutfitter(uid: string) {
@@ -413,6 +413,29 @@ export async function nukeOutfitter(uid: string) {
     return { success: true };
   } catch (error: any) {
     console.error(`CRITICAL: Error nuking outfitter ${uid}:`, error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function deleteHunter(uid: string) {
+  try {
+    // 1. Delete from Firebase Auth
+    try {
+      await adminAuth.deleteUser(uid);
+    } catch (authError: any) {
+      console.warn(`Auth user ${uid} not found. Proceeding to database wipe...`);
+    }
+
+    // 2. Delete from Firestore Users Collection
+    await adminDb.collection("users").doc(uid).delete();
+
+    // 3. Refresh the Admin UI
+    revalidatePath("/admin/hunters"); 
+    revalidatePath("/admin");
+    
+    return { success: true };
+  } catch (error: any) {
+    console.error(`CRITICAL: Error deleting hunter ${uid}:`, error);
     return { success: false, error: error.message };
   }
 }

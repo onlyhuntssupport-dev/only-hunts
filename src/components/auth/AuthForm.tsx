@@ -47,11 +47,15 @@ export default function AuthForm() {
       if (!syncResult.success) throw new Error(syncResult.error || 'Failed to retrieve profile data.');
 
       const idToken = await user.getIdToken();
-      await fetch('/api/auth/session', {
+      const sessionResponse = await fetch('/api/auth/session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ idToken }),
       });
+
+      if (!sessionResponse.ok) {
+        throw new Error('Failed to establish secure session.');
+      }
       
       toast({ title: "Login Successful", description: "Welcome back!" });
 
@@ -67,15 +71,12 @@ export default function AuthForm() {
         router.push('/'); 
       }
       
-      router.refresh();
     } catch (err: any) {
-      // DEV NOTE: Logging full error to console to debug admin rejection
       console.error("FULL LOGIN ERROR:", err); 
       
       if (['auth/invalid-credential', 'auth/user-not-found', 'auth/wrong-password'].includes(err.code)) {
          setError('Invalid email or password. Please try again.');
       } else {
-        // Exposing the actual Firebase error to the UI
         setError(`Error: ${err.message || 'An unexpected error occurred.'}`); 
       }
     } finally {
@@ -104,7 +105,7 @@ export default function AuthForm() {
         email: user.email,
         displayName: name,
         photoURL: null,
-        role: "HUNTER", // Strictly forced to Hunter from this form
+        role: "HUNTER", 
         termsAccepted: termsAccepted,
         termsAcceptedAt: new Date().toISOString(),
         termsVersion: "1.0",
@@ -113,16 +114,19 @@ export default function AuthForm() {
       if (!syncResult.success) throw new Error(syncResult.error || 'Profile sync failed');
 
       const idToken = await user.getIdToken();
-      await fetch('/api/auth/session', {
+      const sessionResponse = await fetch('/api/auth/session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ idToken }),
       });
 
+      if (!sessionResponse.ok) {
+        throw new Error('Failed to establish secure session.');
+      }
+
       toast({ title: "Account Created", description: "Welcome to Only-Hunts!" });
       
       router.push('/hunter/dashboard');
-      router.refresh();
     } catch (err: any) {
       if (err.code === "auth/email-already-in-use") {
         setError("An account with this email already exists. Try logging in.");
@@ -137,11 +141,12 @@ export default function AuthForm() {
   const isSignUpDisabled = !isLogin && !termsAccepted && role === 'HUNTER';
 
   return (
-    <div className="w-full max-w-md mx-auto p-6 relative" suppressHydrationWarning>
+    <div className="w-full max-w-md mx-auto p-6 relative">
       
       <div className="flex justify-center space-x-4 mb-6 border-b border-kalahari/20 dark:border-kalahari/30 pb-2">
         <button 
           type="button"
+          suppressHydrationWarning
           className={`pb-2 font-bold text-lg transition-colors ${isLogin ? 'border-b-4 border-kalahari text-olive dark:text-off-white' : 'text-olive/50 dark:text-off-white/50 hover:text-olive dark:hover:text-off-white'}`}
           onClick={() => { setIsLogin(true); setError(''); }}
         >
@@ -149,6 +154,7 @@ export default function AuthForm() {
         </button>
         <button 
           type="button"
+          suppressHydrationWarning
           className={`pb-2 font-bold text-lg transition-colors ${!isLogin ? 'border-b-4 border-kalahari text-olive dark:text-off-white' : 'text-olive/50 dark:text-off-white/50 hover:text-olive dark:hover:text-off-white'}`}
           onClick={() => { setIsLogin(false); setError(''); }}
         >
@@ -160,11 +166,11 @@ export default function AuthForm() {
         {isLogin ? 'Welcome Back' : 'Join Only-Hunts'}
       </h2>
       
-      {/* Role Toggle for Sign Up */}
       {!isLogin && (
         <div className="flex p-1 space-x-1 bg-kalahari/10 dark:bg-black/40 rounded-xl mb-6 transition-colors">
           <button
             type="button"
+            suppressHydrationWarning
             onClick={() => setRole('HUNTER')}
             className={`w-full flex items-center justify-center gap-2 py-3 text-sm font-bold rounded-lg transition-all ${
               role === 'HUNTER' 
@@ -176,6 +182,7 @@ export default function AuthForm() {
           </button>
           <button
             type="button"
+            suppressHydrationWarning
             onClick={() => setRole('OUTFITTER')}
             className={`w-full flex items-center justify-center gap-2 py-3 text-sm font-bold rounded-lg transition-all ${
               role === 'OUTFITTER' 
@@ -194,10 +201,7 @@ export default function AuthForm() {
         </div>
       )}
 
-      {/* DYNAMIC FORM RENDERING BASED ON ROLE */}
       {(!isLogin && role === "OUTFITTER") ? (
-        
-        // IF THEY CHOOSE OUTFITTER SIGNUP -> PUSH THEM TO THE RIGHT PAGE
         <div className="bg-kalahari/5 dark:bg-kalahari/10 border-2 border-kalahari/20 p-6 rounded-2xl text-center mt-4">
           <ShieldCheck className="h-12 w-12 text-kalahari mx-auto mb-4" />
           <h3 className="text-lg font-black text-olive dark:text-white mb-2">Professional Partner Network</h3>
@@ -205,25 +209,23 @@ export default function AuthForm() {
             To protect our community, all outfitter accounts require business verification and permit uploads. 
           </p>
           <Button 
+            suppressHydrationWarning
             onClick={() => router.push('/outfitter/register')}
             className="w-full bg-olive dark:bg-kalahari text-kalahari dark:text-olive hover:bg-olive/90 dark:hover:bg-kalahari/90 font-black h-14 text-lg shadow-md transition-all rounded-xl"
           >
             Apply as Outfitter <ArrowRight className="h-5 w-5 ml-2" />
           </Button>
         </div>
-
       ) : (
-
-        // STANDARD LOGIN OR HUNTER SIGNUP FORM
         <form onSubmit={isLogin ? handleEmailLogin : handleEmailSignUp} className="space-y-4">
           
-          {/* Terms Checkbox (Only for Hunter Signup) */}
           {!isLogin && (
             <div className="mb-6 bg-kalahari/5 dark:bg-black/40 p-4 rounded-xl border border-kalahari/20 dark:border-kalahari/30">
               <div className="flex items-start gap-3">
                 <input 
                   type="checkbox" 
                   id="legal-terms"
+                  suppressHydrationWarning
                   checked={termsAccepted}
                   onChange={(e) => setTermsAccepted(e.target.checked)}
                   className="mt-1 h-4 w-4 shrink-0 rounded border-gray-300 text-orange-500 focus:ring-orange-500 cursor-pointer"
@@ -251,6 +253,7 @@ export default function AuthForm() {
               <Input 
                 name="name" 
                 required 
+                suppressHydrationWarning
                 value={name} 
                 onChange={(e) => setName(e.target.value)} 
                 placeholder="John Doe" 
@@ -264,6 +267,7 @@ export default function AuthForm() {
             <label className="text-sm font-bold text-olive dark:text-off-white transition-colors">Email Address</label>
             <Input 
               type="email" 
+              suppressHydrationWarning
               placeholder={isLogin ? "user@example.com" : "hunter@example.com"} 
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -284,6 +288,7 @@ export default function AuthForm() {
             </div>
             <Input 
               type="password"
+              suppressHydrationWarning
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -298,6 +303,7 @@ export default function AuthForm() {
               <label className="text-sm font-bold text-olive dark:text-off-white transition-colors">Confirm Password</label>
               <Input 
                 type="password"
+                suppressHydrationWarning
                 placeholder="••••••••"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
@@ -310,6 +316,7 @@ export default function AuthForm() {
 
           <Button 
             type="submit" 
+            suppressHydrationWarning
             className="w-full bg-olive dark:bg-kalahari hover:bg-olive/90 dark:hover:bg-kalahari/90 text-kalahari dark:text-olive font-black h-14 text-lg mt-6 shadow-md transition-all rounded-xl" 
             disabled={isEmailLoading || isSignUpDisabled}
           >
@@ -317,7 +324,6 @@ export default function AuthForm() {
           </Button>
         </form>
       )}
-
     </div>
   );
 }

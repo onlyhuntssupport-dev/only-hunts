@@ -103,12 +103,10 @@ export default function SettingsPage() {
   const handleDeleteAccount = async () => {
     if (!auth.currentUser) return;
     
-    const confirmed = window.confirm("DANGER: This will permanently delete your admin account. You will lose all access to the platform immediately. Proceed?");
+    const confirmed = window.confirm("DANGER: This will permanently delete your hunter profile. You will lose all access to the platform immediately. Proceed?");
     if (!confirmed) return;
 
     try {
-      // Note: In a real app, you might want to call a server action here to clean up Firestore too.
-      // For immediate auth removal per request:
       await deleteUser(auth.currentUser);
       router.push("/");
     } catch (error: any) {
@@ -121,111 +119,111 @@ export default function SettingsPage() {
   };
 
   if (loading) {
-    return <div className="flex h-48 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-amber-800" /></div>;
+    return <div className="flex h-48 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-kalahari" /></div>;
   }
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-2xl space-y-6 animate-in fade-in duration-300">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-stone-900">Profile Settings</h1>
-        <p className="text-stone-500 mt-2">Manage your admin account and security preferences.</p>
+        <h1 className="text-3xl font-black font-headline tracking-tight text-olive dark:text-off-white transition-colors">Profile Settings</h1>
+        <p className="text-olive/70 dark:text-off-white/60 font-medium mt-2 transition-colors">Manage your hunter profile and security preferences.</p>
       </div>
 
-      <div className="rounded-xl border border-stone-200 bg-white shadow-sm overflow-hidden">
+      <div className="rounded-2xl border-2 border-kalahari/20 bg-white dark:bg-stone-900 shadow-sm overflow-hidden transition-colors">
         <form onSubmit={handleSaveProfile} className="p-8 space-y-8">
           
           {/* Avatar Section */}
           <div className="flex items-center gap-6">
-            <div className="relative h-24 w-24 rounded-full border-2 border-stone-200 bg-stone-100 flex items-center justify-center overflow-hidden group">
+            <div className="relative h-24 w-24 rounded-full border-4 border-kalahari/20 bg-stone-100 dark:bg-stone-800 flex items-center justify-center overflow-hidden group transition-colors">
               {photoURL ? (
                 <img src={photoURL} alt="Profile" className="h-full w-full object-cover" />
               ) : (
-                <User className="h-10 w-10 text-stone-400" />
+                <User className="h-10 w-10 text-olive/30 dark:text-off-white/30" />
               )}
-              <label className="absolute inset-0 flex cursor-pointer items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+              <label className="absolute inset-0 flex cursor-pointer items-center justify-center bg-black/60 opacity-0 transition-opacity group-hover:opacity-100">
                 <Camera className="h-6 w-6 text-white" />
                 <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
               </label>
             </div>
             <div>
-              <h3 className="font-bold text-stone-900">Profile Picture</h3>
-              <p className="text-sm text-stone-500">Click the image to upload a new avatar.</p>
+              <h3 className="font-black text-olive dark:text-off-white transition-colors">Profile Picture</h3>
+              <p className="text-sm font-medium text-olive/70 dark:text-off-white/60 transition-colors">Click the image to upload a new avatar.</p>
             </div>
           </div>
 
-          <hr className="border-stone-100" />
+          <hr className="border-kalahari/20 transition-colors" />
 
           {/* Details Section */}
           <div className="space-y-4">
             <div className="grid gap-2">
-              <label className="text-sm font-bold text-stone-700">Full Name</label>
+              <label className="text-sm font-bold text-olive dark:text-off-white transition-colors">Full Name</label>
               <Input 
                 value={name} 
                 onChange={(e) => setName(e.target.value)} 
-                placeholder="e.g. Ruan"
+                placeholder="e.g. John Doe"
                 required 
-                className="max-w-md"
+                className="max-w-md h-12 border-kalahari/40 focus-visible:ring-kalahari bg-off-white dark:bg-black/50 dark:text-white transition-colors"
               />
             </div>
 
             <div className="grid gap-2">
-              <label className="text-sm font-bold text-stone-700">Email Address (Read-only)</label>
-              <Input value={email} disabled className="bg-stone-50 max-w-md text-stone-500" />
+              <label className="text-sm font-bold text-olive dark:text-off-white transition-colors">Email Address (Read-only)</label>
+              <Input value={email} disabled className="bg-stone-100 dark:bg-stone-800/50 max-w-md text-olive/50 dark:text-off-white/50 border-kalahari/20 transition-colors" />
             </div>
           </div>
 
-          <hr className="border-stone-100" />
+          <hr className="border-kalahari/20 transition-colors" />
 
           {/* Security Section */}
           <div className="space-y-4">
             <div>
-              <h3 className="font-bold text-stone-900 flex items-center gap-2"><Lock className="h-4 w-4 text-amber-800"/> Security</h3>
-              <p className="text-sm text-stone-500">Leave blank if you do not want to change your password.</p>
+              <h3 className="font-black text-olive dark:text-off-white flex items-center gap-2 transition-colors"><Lock className="h-4 w-4 text-kalahari"/> Security</h3>
+              <p className="text-sm font-medium text-olive/70 dark:text-off-white/60 transition-colors">Leave blank if you do not want to change your password.</p>
             </div>
             
             <div className="grid gap-2">
-              <label className="text-sm font-bold text-stone-700">New Password</label>
+              <label className="text-sm font-bold text-olive dark:text-off-white transition-colors">New Password</label>
               <Input 
                 type="password" 
                 value={newPassword} 
                 onChange={(e) => setNewPassword(e.target.value)} 
                 placeholder="••••••••"
                 minLength={6}
-                className="max-w-md"
+                className="max-w-md h-12 border-kalahari/40 focus-visible:ring-kalahari bg-off-white dark:bg-black/50 dark:text-white transition-colors"
               />
             </div>
           </div>
 
           {message.text && (
-            <div className={`p-4 rounded-md text-sm font-bold ${message.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
+            <div className={`p-4 rounded-xl text-sm font-bold transition-colors ${message.type === 'success' ? 'bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-400 border border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/30 text-red-800 dark:text-red-400 border border-red-200 dark:border-red-800'}`}>
               {message.text}
             </div>
           )}
 
           <div className="flex justify-end pt-4">
-            <Button type="submit" disabled={saving} className="bg-amber-800 hover:bg-amber-900 text-white gap-2 px-8">
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            <Button type="submit" disabled={saving} className="bg-olive dark:bg-kalahari hover:bg-olive/90 dark:hover:bg-kalahari/90 text-kalahari dark:text-olive font-black h-12 px-8 shadow-md transition-all rounded-xl">
+              {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
               {saving ? "Saving..." : "Save Changes"}
             </Button>
           </div>
         </form>
 
         {/* Danger Zone */}
-        <div className="bg-red-50/50 border-t border-red-100 p-8">
-          <div className="flex items-start justify-between">
+        <div className="bg-red-50 dark:bg-red-950/20 border-t-2 border-red-100 dark:border-red-900/50 p-8 transition-colors">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <h3 className="font-bold text-red-900 flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4" /> Danger Zone
+              <h3 className="font-black text-red-900 dark:text-red-500 flex items-center gap-2 transition-colors">
+                <AlertTriangle className="h-5 w-5" /> Danger Zone
               </h3>
-              <p className="text-sm text-red-700/80 mt-1 max-w-md">
-                Permanently delete your admin account and remove all platform access. This action cannot be undone.
+              <p className="text-sm font-medium text-red-700/80 dark:text-red-400/80 mt-1 max-w-md transition-colors">
+                Permanently delete your hunter profile and remove all platform access. This action cannot be undone.
               </p>
             </div>
             <Button 
               type="button" 
               variant="destructive" 
               onClick={handleDeleteAccount}
-              className="gap-2"
+              className="gap-2 font-black rounded-xl"
             >
               <Trash2 className="h-4 w-4" /> Delete Account
             </Button>

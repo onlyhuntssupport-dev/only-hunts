@@ -1,11 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getAdminMarketplaceStats, getAdmins } from "@/app/actions/admins";
-import { initializeApp, getApps } from "firebase/app";
-import { getAuth, createUserWithEmailAndPassword, signOut } from "firebase/auth";
-import { doc, setDoc, updateDoc } from "firebase/firestore";
-import { auth, db, firebaseConfig } from "@/lib/firebase/client"; 
+import { getAdminMarketplaceStats, getAdmins, createAdmin } from "@/app/actions/admins";
+import { doc, updateDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase/client"; 
 import { Shield, DollarSign, Search, ExternalLink, Activity, History, AlertTriangle, ChevronRight, X, Mail, UserPlus, Lock, Loader2, User, UserMinus, Ban } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import KuduLoader from "@/components/ui/KuduLoader";
@@ -65,7 +63,7 @@ export default function AdminTeamDashboard() {
     loadData();
   }, []);
 
-  // --- CREATE NEW ADMIN ---
+  // --- CREATE NEW ADMIN (SERVER-SIDE BYPASS) ---
   const handleCreateAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newAdminEmail || !newAdminPassword || !newAdminName) return;
@@ -74,45 +72,32 @@ export default function AdminTeamDashboard() {
     setActionMessage({ text: "", type: "" });
 
     try {
-      const apps = getApps();
-      const secondaryApp = apps.find(app => app.name === "GhostApp") || initializeApp(firebaseConfig, "GhostApp");
-      const secondaryAuth = getAuth(secondaryApp);
+      const formData = new FormData();
+      formData.append("name", newAdminName.trim());
+      formData.append("email", newAdminEmail.trim());
+      formData.append("password", newAdminPassword);
+      formData.append("role", "ADMIN");
 
-      const userCredential = await createUserWithEmailAndPassword(secondaryAuth, newAdminEmail.trim(), newAdminPassword);
-      const newUid = userCredential.user.uid;
+      const response = await createAdmin(formData);
 
-      await signOut(secondaryAuth);
-
-      await setDoc(doc(db, "users", newUid), {
-        name: newAdminName.trim(),
-        email: newAdminEmail.trim(),
-        role: "ADMIN",
-        isActive: true,
-        createdAt: new Date().toISOString(),
-        createdBy: auth.currentUser?.email || "System"
-      });
-
-      setActionMessage({ text: "Success! Account created.", type: "success" });
-      
-      setNewAdminName("");
-      setNewAdminEmail("");
-      setNewAdminPassword("");
-      await loadData();
-      
-      setTimeout(() => {
-        setIsAddAdminOpen(false);
-        setActionMessage({ text: "", type: "" });
-      }, 2000);
+      if (response.success) {
+        setActionMessage({ text: "Success! Account created.", type: "success" });
+        setNewAdminName("");
+        setNewAdminEmail("");
+        setNewAdminPassword("");
+        await loadData();
+        
+        setTimeout(() => {
+          setIsAddAdminOpen(false);
+          setActionMessage({ text: "", type: "" });
+        }, 2000);
+      } else {
+        setActionMessage({ text: response.error || "Failed to create account.", type: "error" });
+      }
 
     } catch (error: any) {
       console.error("Error creating staff:", error);
-      if (error.code === 'auth/email-already-in-use') {
-        setActionMessage({ text: "Email already exists.", type: "error" });
-      } else if (error.code === 'auth/weak-password') {
-        setActionMessage({ text: "Password must be at least 6 characters.", type: "error" });
-      } else {
-        setActionMessage({ text: "Failed to create account.", type: "error" });
-      }
+      setActionMessage({ text: "Server connection failed.", type: "error" });
     } finally {
       setIsCreating(false);
     }
@@ -246,7 +231,6 @@ export default function AdminTeamDashboard() {
       {/* SLIDE-OUT ADD ADMIN PANEL */}
       {isAddAdminOpen && (
         <div className="absolute inset-y-0 right-0 w-full lg:w-[450px] bg-white dark:bg-stone-900 shadow-[-20px_0_50px_rgba(0,0,0,0.2)] z-50 animate-in slide-in-from-right duration-300 border-l-4 border-kalahari overflow-y-auto">
-          {/* ... (Unchanged Add Admin Panel UI from previous response) ... */}
           <div className="p-8 h-full flex flex-col">
             <div className="flex justify-between items-center mb-8">
               <h3 className="text-2xl font-black text-olive dark:text-off-white uppercase flex items-center gap-2">

@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
-import Footer from "@/components/ui/Footer"; // <-- IMPORTED FOOTER
+import Footer from "@/components/ui/Footer"; 
 import WhatsAppWidget from "@/components/ui/WhatsAppWidget"; 
+import EndorsementBanner from "@/components/marketplace/EndorsementBanner"; 
 
 export const metadata: Metadata = {
   title: "Only-Hunts",
@@ -24,7 +25,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    // Added suppressHydrationWarning to prevent browser extension mismatch errors
+    // suppressHydrationWarning strictly on the HTML tag to bypass extension conflicts
     <html lang="en" className="dark" suppressHydrationWarning>
       <body className="antialiased min-h-screen bg-olive text-off-white flex flex-col font-body">
         
@@ -35,6 +36,9 @@ export default function RootLayout({
         <main className="flex-grow flex flex-col">
           {children}
         </main>
+
+        {/* --- GLOBAL PRE-FOOTER TRUST SIGNAL --- */}
+        <EndorsementBanner />
 
         {/* --- GLOBAL FOOTER --- */}
         <Footer />

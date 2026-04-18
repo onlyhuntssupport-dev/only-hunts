@@ -173,13 +173,13 @@ export default async function HuntDetailPage({ params }: Props) {
             {/* LEFT COLUMN MAIN WRAPPER (Spans 2 cols) */}
             <div className="lg:col-span-2 space-y-8">
               
-              {/* --- SIDE-BY-SIDE SPLIT --- */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* --- VERTICAL STACK FIX --- */}
+              <div className="flex flex-col gap-8">
                 
-                {/* 1. HALF WIDTH IMAGE GALLERY */}
-                <div className="h-full w-full">
+                {/* 1. FULL WIDTH IMAGE GALLERY */}
+                <div className="w-full">
                   {allImages.length > 0 ? (
-                    <div className="relative w-full h-full min-h-[500px] rounded-3xl overflow-hidden flex flex-col gap-2 border-2 border-kalahari/20 shadow-xl bg-black">
+                    <div className="relative w-full h-[500px] sm:h-[600px] rounded-3xl overflow-hidden flex flex-col gap-2 border-2 border-kalahari/20 shadow-xl bg-black">
                       {/* Main Feature Image (Top) */}
                       <div className={`relative w-full ${allImages.length > 1 ? 'h-2/3' : 'h-full'}`}>
                         <Image src={allImages[0]} alt="Featured Safari Image" fill className="object-cover" priority />
@@ -209,17 +209,17 @@ export default async function HuntDetailPage({ params }: Props) {
                       )}
                     </div>
                   ) : (
-                     <div className="w-full h-full min-h-[500px] bg-black/30 rounded-3xl border-2 border-dashed border-kalahari/20 flex items-center justify-center shadow-inner">
+                     <div className="w-full h-[400px] bg-black/30 rounded-3xl border-2 border-dashed border-kalahari/20 flex items-center justify-center shadow-inner">
                        <Compass className="h-16 w-16 text-kalahari/30" />
                      </div>
                   )}
                 </div>
 
-                {/* 2. HALF WIDTH PACKAGE DETAILS */}
-                <div className="bg-black/20 backdrop-blur-md rounded-3xl border border-kalahari/20 p-6 shadow-lg h-full overflow-y-auto">
+                {/* 2. FULL WIDTH PACKAGE DETAILS */}
+                <div className="bg-black/20 backdrop-blur-md rounded-3xl border border-kalahari/20 p-6 shadow-lg w-full">
                   
                   {/* Quick Specs */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-6 border-b border-kalahari/20 mb-6">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pb-6 border-b border-kalahari/20 mb-6">
                     {huntData.duration && (
                       <div className="flex flex-col">
                         <span className="text-xs font-bold text-kalahari uppercase tracking-widest mb-1">Duration</span>
@@ -232,7 +232,7 @@ export default async function HuntDetailPage({ params }: Props) {
                         <span className="text-base font-black flex items-center line-clamp-1"><Target className="w-4 h-4 mr-2 text-off-white/50" /> {huntData.primarySpecies}</span>
                       </div>
                     )}
-                    <div className="flex flex-col sm:col-span-2">
+                    <div className="flex flex-col col-span-2">
                       <span className="text-xs font-bold text-kalahari uppercase tracking-widest mb-1">Location</span>
                       <span className="text-base font-black flex items-center line-clamp-1"><MapPin className="w-4 h-4 mr-2 text-off-white/50" /> {huntData.province || "South Africa"}</span>
                     </div>
@@ -248,12 +248,12 @@ export default async function HuntDetailPage({ params }: Props) {
                     </div>
                   )}
 
-                  {/* What's Included / Excluded */}
+                  {/* What's Included / Excluded (Side by Side on Desktop) */}
                   {(huntData.includedItems || huntData.excludedItems) && (
-                    <div className="flex flex-col gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {huntData.includedItems && (
-                        <div className="bg-black/30 p-4 rounded-xl border border-kalahari/10">
-                          <h3 className="text-xs font-black text-kalahari uppercase tracking-widest mb-2 flex items-center gap-2">
+                        <div className="bg-black/30 p-5 rounded-xl border border-kalahari/10 h-full">
+                          <h3 className="text-xs font-black text-kalahari uppercase tracking-widest mb-3 flex items-center gap-2">
                             <CheckCircle2 className="h-4 w-4" /> Included
                           </h3>
                           <div className="text-off-white/70 text-xs font-medium whitespace-pre-wrap leading-relaxed">
@@ -262,8 +262,8 @@ export default async function HuntDetailPage({ params }: Props) {
                         </div>
                       )}
                       {huntData.excludedItems && (
-                        <div className="bg-black/30 p-4 rounded-xl border border-red-900/20">
-                          <h3 className="text-xs font-black text-red-500 uppercase tracking-widest mb-2 flex items-center gap-2">
+                        <div className="bg-black/30 p-5 rounded-xl border border-red-900/20 h-full">
+                          <h3 className="text-xs font-black text-red-500 uppercase tracking-widest mb-3 flex items-center gap-2">
                             <XCircle className="h-4 w-4" /> Excluded
                           </h3>
                           <div className="text-off-white/70 text-xs font-medium whitespace-pre-wrap leading-relaxed">
@@ -287,7 +287,7 @@ export default async function HuntDetailPage({ params }: Props) {
                   )}
                 </div>
 
-              </div> {/* END SIDE-BY-SIDE SPLIT */}
+              </div> {/* END VERTICAL STACK FIX */}
 
               {/* FULL WIDTH CARD 2: Meet The Outfitter */}
               <div className="bg-gradient-to-br from-black/60 to-black/30 backdrop-blur-md border-2 border-kalahari/30 rounded-3xl p-8 flex flex-col md:flex-row items-center md:items-start justify-between gap-6 shadow-xl relative overflow-hidden">

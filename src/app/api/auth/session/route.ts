@@ -3,8 +3,8 @@ import { cookies } from "next/headers";
 import { getFirebaseAuth } from "next-firebase-auth-edge";
 import { adminDb } from "@/lib/firebase/admin";
 
-// Initialize the edge auth library
-const { createAuthCookie } = getFirebaseAuth({
+// Initialize the edge auth library as a full object
+const firebaseAuthEdge = getFirebaseAuth({
   serviceAccount: {
     projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!,
     clientEmail: process.env.FIREBASE_CLIENT_EMAIL!,
@@ -30,14 +30,19 @@ export async function POST(request: NextRequest) {
     const role = userDoc.exists ? userDoc.data()?.role : "HUNTER"; // Default fallback
 
     // 3. Create the secure edge-compatible cookie
-    const expiresIn = 60 * 60 * 24 * 5 * 1000; // 5 days
-    const authCookie = await createAuthCookie(idToken, { expiresIn });
+    const expiresInMs = 60 * 60 * 24 * 5 * 1000; // 5 days in milliseconds
+    
+    // FIXED: Use createSessionCookie which returns the string value directly
+    const sessionCookieValue = await firebaseAuthEdge.createSessionCookie(idToken, expiresInMs);
 
     // Next.js 15 requires awaiting cookies()
     const cookieStore = await cookies();
     
-    cookieStore.set("AuthToken", authCookie.value, {
-      maxAge: authCookie.maxAge,
+    // maxAge for cookies() takes seconds, so we divide by 1000
+    const maxAgeSeconds = expiresInMs / 1000;
+
+    cookieStore.set("AuthToken", sessionCookieValue, {
+      maxAge: maxAgeSeconds,
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       path: "/",
@@ -46,7 +51,7 @@ export async function POST(request: NextRequest) {
 
     // Store the role for the middleware to read instantly
     cookieStore.set("UserRole", role, {
-      maxAge: authCookie.maxAge,
+      maxAge: maxAgeSeconds,
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       path: "/",

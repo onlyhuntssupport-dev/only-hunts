@@ -4,8 +4,8 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase/client";
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimestamp } from "firebase/firestore";
-import { getGlobalEntities, getEntityActivity, suspendUser, reinstateUser } from "@/app/actions/admins";
-import { Users, Search, ExternalLink, CheckCircle, History, ChevronRight, X, Mail, Database, Loader2, Target, PauseCircle, PlayCircle, MessageSquare } from "lucide-react";
+import { getGlobalEntities, getEntityActivity, suspendUser, reinstateUser, deleteHunter } from "@/app/actions/admins";
+import { Users, Search, ExternalLink, CheckCircle, History, ChevronRight, X, Mail, Database, Loader2, Target, PauseCircle, PlayCircle, MessageSquare, Trash2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import KuduLoader from "@/components/ui/KuduLoader";
 
@@ -20,6 +20,7 @@ export default function AdminHuntersDashboard() {
   const [entityActivity, setEntityActivity] = useState<any>(null);
   const [isSuspending, setIsSuspending] = useState(false);
   const [isMessaging, setIsMessaging] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -63,6 +64,32 @@ export default function AdminHuntersDashboard() {
       alert(`Failed to ${isCurrentlySuspended ? 'reinstate' : 'suspend'} user: ` + res.error);
     }
     setIsSuspending(false);
+  };
+
+  const handleDeleteHunter = async () => {
+    if (!selectedEntity) return;
+    
+    // Strict failsafe confirmation
+    if (!window.confirm(`CRITICAL WARNING: Are you absolutely sure you want to permanently delete ${selectedEntity.name || "this hunter"}? This will wipe their account, and this action CANNOT be undone.`)) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const res = await deleteHunter(selectedEntity.id);
+      if (res.success) {
+        // Remove from local state instantly to update the table
+        setHunters(hunters.filter(e => e.id !== selectedEntity.id));
+        setSelectedEntity(null); // Close the slide-out
+      } else {
+        alert("Failed to delete hunter: " + res.error);
+      }
+    } catch (error) {
+      console.error("Deletion error:", error);
+      alert("An unexpected error occurred while deleting.");
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleOpenDirectMessage = async () => {
@@ -240,6 +267,26 @@ export default function AdminHuntersDashboard() {
                     {selectedEntity.status === "SUSPENDED" ? "Reinstate Account" : "Suspend Account"}
                   </button>
                 </div>
+
+                {/* DANGER ZONE - Nuke Hunter */}
+                <div className="pt-8 mt-8 border-t border-kalahari/10">
+                  <div className="bg-red-50 dark:bg-red-950/20 p-4 rounded-xl border border-red-100 dark:border-red-900 mb-4">
+                    <p className="text-xs font-bold text-red-800 dark:text-red-400 flex items-center gap-2 mb-1">
+                      <AlertTriangle className="h-4 w-4" /> Danger Zone
+                    </p>
+                    <p className="text-[10px] text-red-600/80 dark:text-red-400/80 leading-relaxed">
+                      Permanently delete this hunter from the platform. This removes their authentication and database records completely.
+                    </p>
+                  </div>
+                  <Button 
+                    onClick={handleDeleteHunter}
+                    disabled={isDeleting}
+                    className="w-full h-12 bg-white dark:bg-stone-900 border-2 border-red-500 text-red-500 hover:bg-red-500 hover:text-white font-black rounded-xl transition-all"
+                  >
+                    {isDeleting ? <Loader2 className="h-5 w-5 animate-spin" /> : <><Trash2 className="h-4 w-4 mr-2" /> Delete Account</>}
+                  </Button>
+                </div>
+
               </div>
             </div>
           </div>

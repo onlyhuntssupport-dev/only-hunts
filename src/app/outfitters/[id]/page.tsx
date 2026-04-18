@@ -37,6 +37,7 @@ export default function OutfitterStorefront({ params }: Props) {
     const fetchStorefrontData = async () => {
       if (!outfitterId) return;
       
+      // BLOCK 1: Fetch Main Profile Data
       try {
         const res = await getOutfitterProfileData(outfitterId);
         
@@ -60,9 +61,18 @@ export default function OutfitterStorefront({ params }: Props) {
           setHunts(sortedHunts);
         } else {
           setError(res.error || "Profile Unavailable");
+          setLoading(false);
+          return; // Stop execution if main profile fails
         }
+      } catch (err) {
+        console.error("Error fetching storefront profile:", err);
+        setError("Failed to load Outfitter profile.");
+        setLoading(false);
+        return;
+      }
 
-        // NEW: Fetch confirmed bookings to block dates on the Hunter's Calendar
+      // BLOCK 2: Fetch Booked Dates (Isolated so it doesn't break profile load on permission error)
+      try {
         const extractedDates: {start: string, end: string}[] = [];
         
         const extractDates = (snap: any) => {
@@ -85,10 +95,9 @@ export default function OutfitterStorefront({ params }: Props) {
         extractDates(snapAuto);
 
         setBookedDates(extractedDates);
-
       } catch (err) {
-        console.error("Error fetching storefront:", err);
-        setError("Failed to load Outfitter profile.");
+        console.warn("Could not fetch booked dates (likely Firestore security rules). Falling back to empty array.", err);
+        // Do not set error state here; allow profile to render
       } finally {
         setLoading(false);
       }
