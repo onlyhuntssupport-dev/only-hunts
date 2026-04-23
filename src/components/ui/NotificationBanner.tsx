@@ -1,34 +1,44 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
+import { AlertCircle, X, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 import { auth } from "@/lib/firebase/client";
 import { requestPushPermission } from "@/lib/firebase/messaging";
-import { BellRing, X, Loader2 } from "lucide-react";
 
-export default function NotificationBanner() {
+export function NotificationBanner() {
   const [isVisible, setIsVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
-    // 1. Check if the browser supports notifications
-    if (typeof window !== "undefined" && "Notification" in window) {
-      // 2. Only show the banner if they haven't made a choice yet ("default" state)
-      if (Notification.permission === "default") {
-        setIsVisible(true);
-      }
-    }
-
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) setUserId(user.uid);
     });
-
     return () => unsubscribe();
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined" || !("Notification" in window) || Notification.permission === "granted" || Notification.permission === "denied") {
+      return;
+    }
+
+    // Only show the banner if they dismissed the big modal
+    const declinedTimestamp = localStorage.getItem("push_prompt_declined");
+    if (declinedTimestamp) {
+      setIsVisible(true);
+    }
+  }, []);
+
+  const handleDismiss = () => {
+    setIsVisible(false);
+  };
+
   const handleEnable = async () => {
     if (!userId) {
-      alert("Please log in to enable notifications.");
+      toast({ title: "Please log in", description: "You must be logged in to enable notifications.", variant: "destructive" });
       return;
     }
 
@@ -36,13 +46,14 @@ export default function NotificationBanner() {
     try {
       const success = await requestPushPermission(userId);
       if (success) {
-        setIsVisible(false); // Hide forever once successful
-        alert("Success! Your device is now connected for instant alerts.");
-      } else {
-        alert("Permission denied. iPhone users: You must tap 'Share' and 'Add to Home Screen' first before Apple allows notifications.");
+        setIsVisible(false);
+        toast({
+          title: "Bush Telegraph Enabled",
+          description: "You're all set to receive instant alerts.",
+        });
       }
     } catch (error) {
-      console.error("Failed to enable notifications:", error);
+      console.error("Error requesting notification permission:", error);
     } finally {
       setLoading(false);
     }
@@ -51,31 +62,32 @@ export default function NotificationBanner() {
   if (!isVisible) return null;
 
   return (
-    <div className="bg-[#F97316] text-white px-4 py-3 shadow-md relative z-50 flex flex-col sm:flex-row items-center justify-between gap-3 transition-all duration-300">
-      <div className="flex items-center gap-3 w-full sm:w-auto">
-        <div className="bg-white/20 p-2 rounded-full shrink-0">
-          <BellRing className="h-5 w-5 text-white animate-pulse" />
+    <div className="bg-kalahari text-white px-4 py-3 sm:px-6 lg:px-8 shadow-md relative z-50">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 max-w-7xl mx-auto">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <AlertCircle className="h-5 w-5 flex-shrink-0" />
+          <p className="text-sm font-medium">
+            Don't miss out on leads or quotes. Enable push notifications.
+          </p>
         </div>
-        <p className="text-sm font-bold leading-tight">
-          Never miss a booking lead! Enable push notifications to get instant alerts.
-        </p>
-      </div>
-      
-      <div className="flex items-center gap-3 w-full sm:w-auto justify-end shrink-0">
-        <button 
-          onClick={handleEnable}
-          disabled={loading}
-          className="bg-white text-[#F97316] hover:bg-orange-50 text-xs font-black uppercase tracking-wider px-4 py-2 rounded shadow-sm transition-colors flex items-center justify-center min-w-[120px]"
-        >
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Enable Now"}
-        </button>
-        <button 
-          onClick={() => setIsVisible(false)}
-          className="p-2 hover:bg-white/20 rounded-full transition-colors focus:outline-none"
-          aria-label="Dismiss"
-        >
-          <X className="h-5 w-5 text-white" />
-        </button>
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <Button 
+            onClick={handleEnable} 
+            disabled={loading}
+            size="sm" 
+            variant="outline" 
+            className="w-full sm:w-auto bg-white text-kalahari hover:bg-gray-100 font-bold whitespace-nowrap border-none"
+          >
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Enable Now"}
+          </Button>
+          <button 
+            onClick={handleDismiss}
+            className="text-white hover:text-gray-200 transition-colors p-1"
+            aria-label="Dismiss banner"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
       </div>
     </div>
   );

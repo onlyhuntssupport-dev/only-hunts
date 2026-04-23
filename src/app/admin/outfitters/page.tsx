@@ -46,7 +46,9 @@ export default function AdminOutfittersDashboard() {
   const handleVerify = async () => {
     if (!selectedEntity) return;
     setIsVerifying(true);
-    const res = await verifyOutfitter(selectedEntity.id);
+    const adminEmail = auth.currentUser?.email || "Unknown Admin";
+    
+    const res = await verifyOutfitter(selectedEntity.id, adminEmail);
     if (res.success) {
       setOutfitters(outfitters.map(e => e.id === selectedEntity.id ? { ...e, status: "VERIFIED" } : e));
       setSelectedEntity({ ...selectedEntity, status: "VERIFIED" });
@@ -66,9 +68,11 @@ export default function AdminOutfittersDashboard() {
     if (!window.confirm(confirmMsg)) return;
 
     setIsSuspending(true);
+    const adminEmail = auth.currentUser?.email || "Unknown Admin";
+    
     const res = isCurrentlySuspended 
-      ? await reinstateUser(selectedEntity.id)
-      : await suspendUser(selectedEntity.id);
+      ? await reinstateUser(selectedEntity.id, adminEmail)
+      : await suspendUser(selectedEntity.id, adminEmail);
     
     if (res.success) {
       const newStatus = isCurrentlySuspended ? "VERIFIED" : "SUSPENDED";
@@ -88,7 +92,8 @@ export default function AdminOutfittersDashboard() {
     if (!window.confirm(confirmMsg)) return;
 
     setIsNuking(true);
-    const res = await nukeOutfitter(selectedEntity.id);
+    const adminEmail = auth.currentUser?.email || "Unknown Admin";
+    const res = await nukeOutfitter(selectedEntity.id, adminEmail);
     
     if (res.success) {
       setOutfitters(outfitters.filter(e => e.id !== selectedEntity.id));

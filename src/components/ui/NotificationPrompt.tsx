@@ -3,15 +3,25 @@
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { BellRing } from "lucide-react";
+import { BellRing, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { auth } from "@/lib/firebase/client";
+import { requestPushPermission } from "@/lib/firebase/messaging";
 
 export function NotificationPrompt() {
   const [isOpen, setIsOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
-    // Check if notifications are already granted or denied at the browser level
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (user) setUserId(user.uid);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
     if (typeof window === "undefined" || !("Notification" in window) || Notification.permission === "granted" || Notification.permission === "denied") {
       return;
     }
@@ -19,13 +29,11 @@ export function NotificationPrompt() {
     const checkCooldown = () => {
       const declinedTimestamp = localStorage.getItem("push_prompt_declined");
       if (!declinedTimestamp) return true;
-
       const daysSinceDeclined = (Date.now() - parseInt(declinedTimestamp, 10)) / (1000 * 60 * 60 * 24);
-      return daysSinceDeclined > 7; // 7-day cooldown
+      return daysSinceDeclined > 7; 
     };
 
     if (checkCooldown()) {
-      // Delay the popup so it doesn't aggressively interrupt the initial page load
       const timer = setTimeout(() => setIsOpen(true), 2500);
       return () => clearTimeout(timer);
     }
@@ -37,23 +45,31 @@ export function NotificationPrompt() {
   };
 
   const handleAccept = async () => {
+    if (!userId) {
+      toast({ title: "Please log in", description: "You must be logged in to enable notifications.", variant: "destructive" });
+      return;
+    }
+
+    setLoading(true);
     try {
-      const permission = await Notification.requestPermission();
+      // Fires the instant Apple-safe protocol
+      const success = await requestPushPermission(userId);
       
-      if (permission === "granted") {
+      if (success) {
         setIsOpen(false);
         toast({
           title: "Bush Telegraph Enabled",
           description: "You're all set to receive instant alerts.",
         });
-        // Future step: Wire this up to Firebase Cloud Messaging (FCM) tokens here
       } else {
-        // If they click block on the browser level, we still close it and start the cooldown
+        // If Apple blocked it or they denied, gracefully close it
         handleDecline();
       }
     } catch (error) {
       console.error("Error requesting notification permission:", error);
       handleDecline();
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -77,13 +93,15 @@ export function NotificationPrompt() {
         <div className="flex flex-col gap-3 mt-6">
           <Button 
             onClick={handleAccept} 
+            disabled={loading}
             className="w-full bg-green-700 hover:bg-green-800 text-white font-bold h-12 text-md transition-all shadow-md hover:shadow-lg"
           >
-            Turn on the Bush Telegraph
+            {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Turn on the Bush Telegraph"}
           </Button>
           <Button 
             variant="ghost" 
             onClick={handleDecline}
+            disabled={loading}
             className="w-full text-olive/60 hover:text-olive dark:text-off-white/60 dark:hover:text-off-white font-medium"
           >
             I'll risk missing out

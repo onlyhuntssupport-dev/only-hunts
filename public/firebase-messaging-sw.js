@@ -12,13 +12,8 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
+// Firebase automatically handles the display of the notification.
+// We only use this listener to log the event or handle invisible 'data-only' payloads.
 messaging.onBackgroundMessage((payload) => {
-  const notificationTitle = payload.notification.title;
-  const notificationOptions = {
-    body: payload.notification.body,
-    icon: '/favicon.ico',
-    badge: '/favicon.ico',
-  };
-
-  self.registration.showNotification(notificationTitle, notificationOptions);
+  console.log('[firebase-messaging-sw.js] Background payload received: ', payload);
 });

@@ -14,6 +14,14 @@ service cloud.firestore {
              (userDoc.data.role == 'ADMIN' || userDoc.data.role == 'SUPER_ADMIN' || userDoc.data.role == 'SUPERADMIN');
     }
 
+    function isSuperAdmin() {
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return isAuthenticated() && 
+             userDoc != null && 
+             'role' in userDoc.data && 
+             (userDoc.data.role == 'SUPER_ADMIN' || userDoc.data.role == 'SUPERADMIN');
+    }
+
     function isParticipantInChat(chatId) {
       let chatDoc = get(/databases/$(database)/documents/chats/$(chatId));
       return chatDoc != null && 
@@ -152,6 +160,18 @@ service cloud.firestore {
     match /analytics/{docId} {
       allow write: if true; 
       allow read: if isAuthenticated();
+    }
+
+    // SARS ACCOUNTING IMMUTABLE LEDGER
+    match /transactions/{transactionId} {
+      allow read: if isSuperAdmin();
+      allow create, update, delete: if false; 
+    }
+
+    // AUDIT LOGS
+    match /audit_logs/{logId} {
+      allow read: if isSuperAdmin();
+      allow create, update, delete: if false;
     }
   }
 }

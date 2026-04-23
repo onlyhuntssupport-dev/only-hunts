@@ -5,18 +5,18 @@ import { auth } from '@/lib/firebase/client';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { LayoutDashboard, Package, Users, Menu } from 'lucide-react';
+import { LayoutDashboard, Package, Users, Menu, Map } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import LogoutButton from '@/components/auth/LogoutButton';
 import KuduLoader from '@/components/ui/KuduLoader';
 import { NotificationPrompt } from "@/components/ui/NotificationPrompt";
 import SupportModal from '@/components/support/SupportModal';
 
-// FIX: Updated the label to "Public Profile" and the href to point to the edit page
 const navLinks = [
   { href: "/outfitter/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/outfitter/dashboard/hunts", label: "My Hunts", icon: Package },
   { href: "/outfitter/dashboard/leads", label: "Inquiries", icon: Users },
+  { href: "/outfitter/dashboard/trade-show", label: "Trade Show Spoor", icon: Map },
   { href: "/profile/edit", label: "Public Profile", isCustomLogo: true }, 
 ];
 
@@ -53,7 +53,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr] bg-off-white dark:bg-olive transition-colors duration-300">
       
       {/* --- DESKTOP SIDEBAR --- */}
-      {/* FIX: Added 'relative z-40 shadow-xl' to force it above the page background */}
       <aside className="hidden border-r-2 border-kalahari/30 dark:border-kalahari/20 bg-off-white dark:bg-black/20 md:block transition-colors relative z-40 shadow-xl">
         <div className="flex h-full max-h-screen flex-col gap-2">
           
@@ -84,7 +83,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   href={link.href}
                   className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-olive dark:text-off-white/70 transition-all hover:text-olive dark:hover:text-kalahari hover:bg-kalahari/20 dark:hover:bg-kalahari/10"
                 >
-                  {/* Conditionally render the custom logo OR the standard icon */}
                   {link.isCustomLogo ? (
                     <div className="relative h-5 w-5 shrink-0 drop-shadow-[0_0_5px_rgba(209,164,123,0.5)]">
                       <Image src="/logo-transparent.png" alt="OH Logo" fill className="object-contain" />
@@ -110,7 +108,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="flex flex-col">
         
         {/* Mobile Header */}
-        {/* FIX: Added 'relative z-40 shadow-md' here as well */}
         <header className="flex h-16 items-center gap-4 border-b-2 border-kalahari/30 dark:border-kalahari/20 bg-olive dark:bg-black/40 px-4 md:hidden transition-colors relative z-40 shadow-md">
           <Sheet>
             <SheetTrigger asChild>

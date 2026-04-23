@@ -9,7 +9,7 @@ export async function middleware(request: NextRequest) {
 
   // 2. If they are NOT logged in, kick them out of protected routes
   if (!authToken) {
-    if (path.startsWith('/admin') || path.startsWith('/outfitter') || path.startsWith('/hunter')) {
+    if (path.startsWith('/admin') || path.startsWith('/outfitter/dashboard') || path.startsWith('/hunter')) {
       return NextResponse.redirect(new URL('/login', request.url));
     }
     return NextResponse.next();
@@ -19,28 +19,35 @@ export async function middleware(request: NextRequest) {
   
   // Prevent logged-in users from seeing the login page
   if (path.startsWith('/login') || path.startsWith('/signup')) {
-    if (userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') return NextResponse.redirect(new URL('/admin', request.url));
+    if (userRole === 'ADMIN' || userRole === 'SUPER_ADMIN' || userRole === 'SUPERADMIN') return NextResponse.redirect(new URL('/admin', request.url));
     if (userRole === 'OUTFITTER') return NextResponse.redirect(new URL('/outfitter/dashboard', request.url));
     return NextResponse.redirect(new URL('/', request.url));
   }
 
   // Admin Route Protection
   if (path.startsWith('/admin')) {
-    if (userRole !== 'ADMIN' && userRole !== 'SUPER_ADMIN') {
+    if (userRole !== 'ADMIN' && userRole !== 'SUPER_ADMIN' && userRole !== 'SUPERADMIN') {
       return NextResponse.redirect(new URL('/', request.url));
+    }
+    
+    // NEW: Strict SARS Accounting Protection (Only Super Admins)
+    if (path.startsWith('/admin/sars-accounting')) {
+      if (userRole !== 'SUPER_ADMIN' && userRole !== 'SUPERADMIN') {
+        return NextResponse.redirect(new URL('/admin', request.url)); // Bounce regular admins back to main admin dash
+      }
     }
   }
 
   // Outfitter Route Protection
-  if (path.startsWith('/outfitter')) {
-    if (userRole !== 'OUTFITTER' && userRole !== 'ADMIN' && userRole !== 'SUPER_ADMIN') {
+  if (path.startsWith('/outfitter/dashboard')) {
+    if (userRole !== 'OUTFITTER' && userRole !== 'ADMIN' && userRole !== 'SUPER_ADMIN' && userRole !== 'SUPERADMIN') {
       return NextResponse.redirect(new URL('/', request.url));
     }
   }
 
-  // Hunter Dashboard Protection (Optional, assuming Hunters have a dashboard)
+  // Hunter Dashboard Protection
   if (path.startsWith('/hunter')) {
-    if (userRole !== 'HUNTER' && userRole !== 'ADMIN' && userRole !== 'SUPER_ADMIN') {
+    if (userRole !== 'HUNTER' && userRole !== 'ADMIN' && userRole !== 'SUPER_ADMIN' && userRole !== 'SUPERADMIN') {
       return NextResponse.redirect(new URL('/', request.url));
     }
   }
@@ -48,11 +55,10 @@ export async function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
-// Ensure the middleware only runs on specific paths to save server costs
 export const config = {
   matcher: [
     '/admin/:path*',
-    '/outfitter/:path*',
+    '/outfitter/dashboard/:path*', 
     '/hunter/:path*',
     '/login',
     '/signup'

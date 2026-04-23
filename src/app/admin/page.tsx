@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getAdminMarketplaceStats, getAdmins, createAdmin } from "@/app/actions/admins";
+// Added updateAdminRole to the imports
+import { getAdminMarketplaceStats, getAdmins, createAdmin, updateAdminRole } from "@/app/actions/admins";
 import { doc, updateDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase/client"; 
-import { Shield, DollarSign, Search, ExternalLink, Activity, History, AlertTriangle, ChevronRight, X, Mail, UserPlus, Lock, Loader2, User, UserMinus, Ban } from "lucide-react";
+import { Shield, DollarSign, Search, ExternalLink, Activity, History, AlertTriangle, ChevronRight, X, Mail, UserPlus, Lock, Loader2, User, UserMinus, Ban, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import KuduLoader from "@/components/ui/KuduLoader";
 
@@ -26,8 +27,9 @@ export default function AdminTeamDashboard() {
   const [newAdminPassword, setNewAdminPassword] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   
-  // Revoke State
+  // Revoke & Role State
   const [isRevoking, setIsRevoking] = useState(false);
+  const [isUpdatingRole, setIsUpdatingRole] = useState(false);
   const [actionMessage, setActionMessage] = useState({ text: "", type: "" });
 
   const loadData = async () => {
@@ -103,15 +105,43 @@ export default function AdminTeamDashboard() {
     }
   };
 
+  // --- UPDATE ROLE (PROMOTE / DEMOTE) ---
+  const handleUpdateRole = async (adminId: string, adminEmail: string, newRole: string) => {
+    if (adminEmail === currentUserEmail) {
+      alert("Failsafe Triggered: You cannot alter your own role.");
+      return;
+    }
+
+    const actionText = newRole === "SUPER_ADMIN" ? "promote" : "demote";
+    if (!confirm(`Are you sure you want to ${actionText} ${adminEmail} to ${newRole}?`)) {
+      return;
+    }
+
+    try {
+      setIsUpdatingRole(true);
+      const response = await updateAdminRole(adminId, newRole);
+
+      if (response && response.success) {
+        await loadData();
+        setSelectedAdmin({ ...selectedAdmin, role: newRole }); // Optimistic UI update
+      } else {
+        alert(response?.error || "Failed to update role. Check server logs.");
+      }
+    } catch (error) {
+      console.error("Error updating role:", error);
+      alert("System error updating role.");
+    } finally {
+      setIsUpdatingRole(false);
+    }
+  };
+
   // --- REVOKE ADMIN ACCESS ---
   const handleRevokeAccess = async (adminId: string, adminEmail: string) => {
-    // 1. Double Failsafe
     if (adminEmail === currentUserEmail) {
       alert("Failsafe Triggered: You cannot revoke your own access.");
       return;
     }
 
-    // 2. Confirmation Check
     if (!confirm(`Are you absolutely sure you want to revoke access for ${adminEmail}? They will immediately be locked out.`)) {
       return;
     }
@@ -126,7 +156,7 @@ export default function AdminTeamDashboard() {
       });
 
       await loadData();
-      setSelectedAdmin(null); // Close dossier panel
+      setSelectedAdmin(null); 
 
     } catch (error) {
       console.error("Error revoking access:", error);
@@ -341,15 +371,36 @@ export default function AdminTeamDashboard() {
               )}
             </div>
 
-            {/* REVOKE BUTTON - Only show if current user is SUPER_ADMIN, selected is not revoked, and selected is NOT current user */}
-            {currentUserRole === "SUPER_ADMIN" && selectedAdmin.role !== "REVOKED" && selectedAdmin.email !== currentUserEmail && (
-              <div className="pt-8 mt-8 border-t border-kalahari/10">
-                <div className="bg-red-50 dark:bg-red-950/20 p-4 rounded-xl border border-red-100 dark:border-red-900 mb-4">
+            {/* MANAGEMENT CONTROLS - Only show if current user is SUPER_ADMIN and selected is not current user */}
+            {currentUserRole === "SUPER_ADMIN" && selectedAdmin.email !== currentUserEmail && selectedAdmin.role !== "REVOKED" && (
+              <div className="pt-8 mt-8 border-t border-kalahari/10 space-y-4">
+                
+                {/* Promote / Demote Buttons */}
+                {selectedAdmin.role === "ADMIN" ? (
+                  <Button 
+                    onClick={() => handleUpdateRole(selectedAdmin.id, selectedAdmin.email, "SUPER_ADMIN")}
+                    disabled={isUpdatingRole}
+                    className="w-full h-12 bg-white dark:bg-stone-900 border-2 border-blue-500 text-blue-500 hover:bg-blue-500 hover:text-white font-black rounded-xl transition-all"
+                  >
+                    {isUpdatingRole ? <Loader2 className="h-5 w-5 animate-spin" /> : <><ArrowUpCircle className="h-4 w-4 mr-2" /> Promote to Super Admin</>}
+                  </Button>
+                ) : (
+                  <Button 
+                    onClick={() => handleUpdateRole(selectedAdmin.id, selectedAdmin.email, "ADMIN")}
+                    disabled={isUpdatingRole}
+                    className="w-full h-12 bg-white dark:bg-stone-900 border-2 border-orange-500 text-orange-500 hover:bg-orange-500 hover:text-white font-black rounded-xl transition-all"
+                  >
+                    {isUpdatingRole ? <Loader2 className="h-5 w-5 animate-spin" /> : <><ArrowDownCircle className="h-4 w-4 mr-2" /> Demote to Standard Admin</>}
+                  </Button>
+                )}
+
+                {/* Revoke Access Button */}
+                <div className="bg-red-50 dark:bg-red-950/20 p-4 rounded-xl border border-red-100 dark:border-red-900 mb-4 mt-8">
                   <p className="text-xs font-bold text-red-800 dark:text-red-400 flex items-center gap-2 mb-1">
                     <AlertTriangle className="h-4 w-4" /> Danger Zone
                   </p>
                   <p className="text-[10px] text-red-600/80 dark:text-red-400/80 leading-relaxed">
-                    Revoking access immediately blocks this user from logging in. Their historical data and actions will be preserved for auditing.
+                    Revoking access immediately blocks this user from logging in.
                   </p>
                 </div>
                 <Button 

@@ -8,7 +8,7 @@ import { auth, db } from "@/lib/firebase/client";
 import { doc, getDoc, collection, query, where, onSnapshot } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import { Button } from "@/components/ui/button";
-import { LogOut, LayoutDashboard, Loader2, Compass, User, MessageSquare, Heart, Settings, ChevronDown, Briefcase } from "lucide-react";
+import { LogOut, LayoutDashboard, Loader2, Compass, User, MessageSquare, Heart, Settings, ChevronDown, Briefcase, Target } from "lucide-react";
 import SupportModal from "@/components/support/SupportModal";
 
 export default function Navbar() {
@@ -232,7 +232,7 @@ export default function Navbar() {
                           
                           <div className="px-4 py-3 border-b-2 border-kalahari/10 dark:border-kalahari/20 bg-off-white dark:bg-black/20">
                             <p className="text-sm font-black text-olive dark:text-off-white truncate transition-colors">
-                              {user.displayName || (role === "OUTFITTER" ? "Outfitter Account" : role === "ADMIN" ? "Admin" : "Hunter Account")}
+                              {user.displayName || (role === "OUTFITTER" ? "Outfitter Account" : role === "ADMIN" || role === "SUPER_ADMIN" ? "Admin" : "Hunter Account")}
                             </p>
                             <p className="text-xs font-medium text-olive dark:text-off-white/60 dark:text-kalahari/80 truncate transition-colors">{user.email}</p>
                           </div>
@@ -270,17 +270,26 @@ export default function Navbar() {
                                 <LayoutDashboard className="h-4 w-4 mr-3 text-kalahari" /> Admin Panel
                               </Link>
                             ) : (
-                              <Link 
-                                href="/hunter/dashboard" 
-                                onClick={() => setDropdownOpen(false)}
-                                className="flex items-center px-3 py-2 text-sm font-bold text-olive dark:text-off-white/80 hover:text-olive dark:hover:text-kalahari hover:bg-kalahari/10 rounded-lg transition-colors"
-                              >
-                                <Heart className="h-4 w-4 mr-3 text-kalahari" /> Saved Wishlist
-                              </Link>
+                              <>
+                                <Link 
+                                  href="/hunter/dashboard#inquiries" 
+                                  onClick={() => setDropdownOpen(false)}
+                                  className="flex items-center px-3 py-2 text-sm font-bold text-olive dark:text-off-white/80 hover:text-olive dark:hover:text-kalahari hover:bg-kalahari/10 rounded-lg transition-colors"
+                                >
+                                  <Target className="h-4 w-4 mr-3 text-kalahari" /> My Bookings
+                                </Link>
+                                <Link 
+                                  href="/hunter/wishlist" 
+                                  onClick={() => setDropdownOpen(false)}
+                                  className="flex items-center px-3 py-2 text-sm font-bold text-olive dark:text-off-white/80 hover:text-olive dark:hover:text-kalahari hover:bg-kalahari/10 rounded-lg transition-colors"
+                                >
+                                  <Heart className="h-4 w-4 mr-3 text-kalahari" /> Saved Wishlist
+                                </Link>
+                              </>
                             )}
 
                             <Link 
-                              href="/profile/edit" 
+                              href={role === "OUTFITTER" ? "/outfitter/dashboard/settings" : role === "ADMIN" || role === "SUPER_ADMIN" ? "/admin/settings" : "/hunter/dashboard/settings"} 
                               onClick={() => setDropdownOpen(false)}
                               className="flex items-center px-3 py-2 text-sm font-bold text-olive dark:text-off-white/80 hover:text-olive dark:hover:text-kalahari hover:bg-kalahari/10 rounded-lg transition-colors"
                             >

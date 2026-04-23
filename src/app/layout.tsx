@@ -8,7 +8,6 @@ import EndorsementBanner from "@/components/marketplace/EndorsementBanner";
 export const metadata: Metadata = {
   title: "Only-Hunts",
   description: "Premium African Hunting Marketplace",
-  manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -25,8 +24,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    // suppressHydrationWarning strictly on the HTML tag to bypass extension conflicts
     <html lang="en" className="dark" suppressHydrationWarning>
+      <head>
+        <link rel="manifest" href="/manifest.json" crossOrigin="use-credentials" />
+      </head>
       <body className="antialiased min-h-screen bg-olive text-off-white flex flex-col font-body">
         
         {/* --- GLOBAL SMART HEADER --- */}

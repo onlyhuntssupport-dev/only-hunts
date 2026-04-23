@@ -5,7 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { auth, db } from '@/lib/firebase/client';
 import { doc, getDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
-import { Shield, Store, Users, Activity, Wallet, Inbox, Loader2, BarChart, Award, Megaphone, Menu, X } from 'lucide-react';
+import { Shield, Store, Users, Activity, Wallet, Inbox, Loader2, BarChart, Award, Megaphone, Menu, X, Landmark, ClipboardList } from 'lucide-react';
 
 const navLinks = [
   { href: '/admin', label: 'Staff / Team', icon: Shield },
@@ -13,6 +13,10 @@ const navLinks = [
   { href: '/admin/hunters', label: 'Hunters', icon: Users },
   { href: '/admin/pipeline', label: 'Quote Flow', icon: Activity },
   { href: '/admin/accounting', label: 'Accounting', icon: Wallet },
+  // NEW: Protected SARS Accounting Route
+  { href: '/admin/sars-accounting', label: 'SARS Ledger', icon: Landmark, requireSuperAdmin: true }, 
+  // NEW: Protected Audit Log Route
+  { href: '/admin/audit-logs', label: 'Audit Logs', icon: ClipboardList, requireSuperAdmin: true }, 
   { href: '/admin/endorsements', label: 'Endorsements', icon: Award },
   { href: '/admin/ads', label: 'Sponsored Ads', icon: Megaphone },
   { href: '/admin/support', label: 'Support Inbox', icon: Inbox, isSupport: true }, 
@@ -23,6 +27,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
   const pathname = usePathname(); 
   const [isAuthorized, setIsAuthorized] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null); // NEW: Track exact role for UI rendering
   const [loading, setLoading] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [openTicketsCount, setOpenTicketsCount] = useState(0);
@@ -42,6 +47,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           const role = userDoc.data().role?.toUpperCase();
           if (role === 'ADMIN' || role === 'SUPER_ADMIN' || role === 'SUPERADMIN') {
             setIsAuthorized(true);
+            setUserRole(role); // Save role to state
           } else {
             router.replace('/');
           }
@@ -124,6 +130,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
           {navLinks.map(link => {
+            // NEW: Hide Super Admin links from regular Admins
+            if (link.requireSuperAdmin && userRole !== 'SUPER_ADMIN' && userRole !== 'SUPERADMIN') {
+              return null;
+            }
+
             const isActive = pathname === link.href;
             
             return (

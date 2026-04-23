@@ -1,7 +1,8 @@
 export const dynamic = 'force-dynamic';
 
 import { approveHuntListing, approveOutfitter } from '@/app/actions/admins';
-import { adminDb } from '@/lib/firebase/admin';
+import { adminDb, adminAuth } from '@/lib/firebase/admin';
+import { cookies } from 'next/headers';
 import { CheckCircle, ExternalLink, ShieldCheck, Map, FileText } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -12,6 +13,22 @@ import Link from 'next/link';
 import { revalidatePath } from 'next/cache';
 
 export default async function ApprovalsPage() {
+  // --- SECURE AUDIT LOGGING: Extract current admin email from secure cookie ---
+  let adminEmail = "Unknown Admin";
+  try {
+    const token = cookies().get('AuthToken')?.value;
+    if (token) {
+      // Try verifying as ID token, fallback to Session Cookie if needed
+      const decoded = await adminAuth.verifyIdToken(token).catch(() => adminAuth.verifySessionCookie(token));
+      if (decoded && decoded.email) {
+        adminEmail = decoded.email;
+      }
+    }
+  } catch (error) {
+    console.warn("Could not decode admin token for audit logging. Defaulting to Unknown.");
+  }
+  // ---------------------------------------------------------------------------
+
   // 1. Fetch Pending Hunts
   const pendingHuntsSnapshot = await adminDb
     .collection('hunts')
@@ -130,7 +147,7 @@ export default async function ApprovalsPage() {
                           <form
                             action={async () => {
                               'use server';
-                              await approveOutfitter(outfitter.id);
+                              await approveOutfitter(outfitter.id, adminEmail);
                               revalidatePath('/admin/approvals');
                             }}
                             className="inline-block"
@@ -203,7 +220,7 @@ export default async function ApprovalsPage() {
                           <form
                             action={async () => {
                               'use server';
-                              await approveHuntListing(hunt.id);
+                              await approveHuntListing(hunt.id, adminEmail);
                               revalidatePath('/admin/approvals');
                             }}
                             className="inline-block"

@@ -1,24 +1,16 @@
-"use client"; // Switched to client-side to manage auth state & modals
+"use client";
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { collection, query, where, getDocs } from "firebase/firestore";
-import { db, auth } from "@/lib/firebase/client"; // Use client DB
+import { db, auth } from "@/lib/firebase/client"; 
 import { MapPin, Calendar, DollarSign, ArrowRight, Compass, User, AlertCircle, Target, Flame, Star, ChevronRight } from "lucide-react";
 import MarketplaceSearch from "@/components/marketplace/MarketplaceSearch";
 import KuduLoader from "@/components/ui/KuduLoader";
-
-// MODAL ACTIVATED: Imported the AuthModal component
 import AuthModal from "@/components/auth/AuthModal"; 
-
-// TRUST SIGNALS ACTIVATED
 import TrustBanner from "@/components/ui/TrustBanner";
-
-// NEW: Mission Card Component
 import MissionCard from "@/components/home/MissionCard";
-
-// AD ENGINE IMPORTS
 import { getActiveAdsByPlacement } from "@/app/actions/ads";
 import SponsoredAdCard from "@/components/marketplace/SponsoredAdCard";
 
@@ -44,7 +36,7 @@ interface Hunt {
 
 export default function HomePage({ searchParams }: { searchParams: any }) {
   const [allHunts, setAllHunts] = useState<Hunt[]>([]);
-  const [inFeedAds, setInFeedAds] = useState<any[]>([]); // AD ENGINE STATE
+  const [inFeedAds, setInFeedAds] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -69,12 +61,9 @@ export default function HomePage({ searchParams }: { searchParams: any }) {
         const snapshot = await getDocs(query(collection(db, "hunts"), where("status", "==", "APPROVED")));
         let huntsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Hunt));
         
-        // Let's shuffle the data slightly so it's not always the exact same order for fairness
         huntsData = huntsData.sort(() => Math.random() - 0.5);
-
         setAllHunts(huntsData);
 
-        // AD ENGINE: Fetch Active Ads
         const adsRes = await getActiveAdsByPlacement("IN_FEED");
         if (adsRes.success && adsRes.data) {
           setInFeedAds(adsRes.data);
@@ -125,7 +114,6 @@ export default function HomePage({ searchParams }: { searchParams: any }) {
     return matchesQuery && matchesLocation && matchesPrice;
   });
 
-  // Cap the displays to a maximum of 8 items for the carousel
   const featuredHunts = filteredHunts.filter(hunt => hunt.promoTier === "FEATURED").slice(0, 8);
   const standardHunts = filteredHunts.filter(hunt => hunt.promoTier !== "FEATURED").slice(0, 8);
 
@@ -141,7 +129,6 @@ export default function HomePage({ searchParams }: { searchParams: any }) {
       {/* ========================================== */}
       <section className="relative pt-20 pb-32 px-4 sm:px-6 lg:px-8 overflow-hidden min-h-[65vh] md:min-h-[85vh] flex items-center justify-center">
         
-        {/* Background Image */}
         <div 
           className="absolute inset-0 z-0 bg-cover bg-[position:75%_center] md:bg-center bg-no-repeat"
           style={{ backgroundImage: "url('/Only-Hunts_backround.png')" }}
@@ -151,7 +138,7 @@ export default function HomePage({ searchParams }: { searchParams: any }) {
         
         <div className="max-w-5xl mx-auto flex flex-col items-center text-center relative z-10 w-full mt-8 md:mt-0">
           
-          <div className="relative mb-6 md:mb-10 group w-28 md:w-48 lg:w-56">
+          <div className="relative mb-4 md:mb-6 group w-28 md:w-48 lg:w-56">
             <div className="absolute inset-0 bg-orange-500/20 blur-3xl rounded-full scale-150 animate-pulse mix-blend-screen pointer-events-none" />
             <Image 
               src="/logo-transparent.png" 
@@ -163,13 +150,15 @@ export default function HomePage({ searchParams }: { searchParams: any }) {
             />
           </div>
 
-          <h1 className="text-4xl md:text-6xl lg:text-7xl font-headline font-black tracking-tighter mb-3 md:mb-4 text-white drop-shadow-xl uppercase leading-tight">
-            Tell Your <span className="text-kalahari">Story</span>
+          <h1 className="text-5xl md:text-7xl lg:text-8xl font-headline font-extrabold tracking-tight mb-2 md:mb-3 text-off-white drop-shadow-xl leading-none">
+            Only-Hunts
           </h1>
           
-          <p className="text-base md:text-xl text-off-white/90 max-w-2xl mb-0 font-bold tracking-wide drop-shadow-md leading-relaxed px-4">
-            The Premier Marketplace for Verified South African Outfitters.
-          </p>
+          <div className="inline-block bg-black/40 backdrop-blur-md px-6 py-2.5 md:py-3 md:px-8 rounded-full border border-kalahari/20 shadow-[0_4px_30px_rgba(0,0,0,0.8)] mt-2 md:mt-4">
+            <p className="text-xs md:text-sm text-kalahari mb-0 font-black tracking-[0.2em] md:tracking-[0.25em] uppercase text-center drop-shadow-md">
+              Ancient Pursuit. Modern Precision.
+            </p>
+          </div>
           
         </div>
       </section>
@@ -235,13 +224,17 @@ export default function HomePage({ searchParams }: { searchParams: any }) {
         <div className="absolute inset-0 z-0 bg-gradient-to-b from-olive via-black/70 to-black/75"></div>
 
         <div className="relative z-10">
-          <div className="mb-8 flex items-center justify-between pr-4 sm:pr-6 lg:pr-8">
-            <div>
-              <h2 className="text-3xl font-headline font-black text-off-white drop-shadow-md">
+          <div className="mb-8 flex flex-col justify-center pr-4 sm:pr-6 lg:pr-8">
+            <h2 className="text-4xl md:text-5xl font-headline font-black tracking-tighter mb-3 text-white drop-shadow-md uppercase">
+              Tell Your <span className="text-kalahari">Story</span>
+            </h2>
+            <div className="flex items-center gap-3">
+              <h3 className="text-xl font-bold text-off-white/90 drop-shadow-sm">
                 {searchQuery || locationQuery || maxPriceQuery ? 'Search Results' : 'The Marketplace'}
-              </h2>
-              <p className="text-kalahari mt-2 font-bold text-sm drop-shadow-sm">
-                Swipe to explore verified packages
+              </h3>
+              <span className="text-kalahari/50 hidden sm:inline-block">•</span>
+              <p className="text-kalahari font-bold text-sm drop-shadow-sm uppercase tracking-wider hidden sm:inline-block">
+                Swipe to explore
               </p>
             </div>
           </div>
