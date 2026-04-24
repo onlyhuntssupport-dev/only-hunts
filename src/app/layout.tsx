@@ -28,7 +28,7 @@ export default function RootLayout({
       <head>
         <link rel="manifest" href="/manifest.json" crossOrigin="use-credentials" />
       </head>
-      <body className="antialiased min-h-screen bg-olive text-off-white flex flex-col font-body">
+      <body className="antialiased min-h-screen bg-olive text-off-white flex flex-col font-body" suppressHydrationWarning>
         
         {/* --- GLOBAL SMART HEADER --- */}
         <Navbar />
