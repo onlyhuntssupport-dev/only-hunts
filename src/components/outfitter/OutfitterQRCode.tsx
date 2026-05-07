@@ -15,15 +15,11 @@ export default function OutfitterQRCode({ outfitterId, companyName }: OutfitterQ
   const [profileUrl, setProfileUrl] = useState<string>("");
   
   useEffect(() => {
-    // Temporary override for local mobile testing via LocalTunnel
-    const DEV_PROXY_URL = "https://four-seals-drive.loca.lt";
-
-    // Safely grab the base URL only after the component has mounted in the browser
-    const baseUrl = process.env.NODE_ENV === "development" 
-      ? DEV_PROXY_URL 
-      : window.location.origin;
-    
-    setProfileUrl(`${baseUrl}/outfitters/${outfitterId}`);
+    // ALWAYS use the absolute, current window location origin.
+    // This dynamically handles localhost:3000 in dev and https://www.only-hunts.com in production without hardcoding URLs.
+    if (typeof window !== 'undefined') {
+      setProfileUrl(`${window.location.origin}/outfitters/${outfitterId}`);
+    }
   }, [outfitterId]);
 
   // Download logic for Print (Infinite scaling vector)

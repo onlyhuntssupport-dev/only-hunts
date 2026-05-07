@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useSearchParams } from "next/navigation";
 import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase/client"; 
 import { ArrowRight, Flame } from "lucide-react";
@@ -26,7 +27,10 @@ interface Hunt {
   title?: string;
   primarySpecies?: string;
   additionalSpecies?: string;
+  species?: string[];
   location?: string;
+  country?: string;
+  region?: string;
   province?: string;
   price?: number;
   basePrice?: number;
@@ -39,27 +43,21 @@ interface Hunt {
   effectiveTier?: string; 
 }
 
-export default function HomePage({ searchParams }: { searchParams: any }) {
+function HomeContent() {
+  const searchParams = useSearchParams();
+  
   const [allHunts, setAllHunts] = useState<Hunt[]>([]);
   const [inFeedAds, setInFeedAds] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [locationQuery, setLocationQuery] = useState("");
-  const [maxPriceQuery, setMaxPriceQuery] = useState<number | null>(null);
-
-  // --- 1. PARAMETER UNWRAPPING ---
-  useEffect(() => {
-    const unwrapParams = async () => {
-      const params = await searchParams;
-      if (params?.q) setSearchQuery(String(params.q).toLowerCase());
-      if (params?.loc) setLocationQuery(String(params.loc).toLowerCase());
-      if (params?.price) setMaxPriceQuery(parseInt(String(params.price)));
-    };
-    unwrapParams();
-  }, [searchParams]);
+  // --- 1. SYNCHRONOUS PARAMETER READING (Fixes the infinite loop) ---
+  const searchQuery = searchParams.get("q")?.toLowerCase() || "";
+  const locationQuery = searchParams.get("loc")?.toLowerCase() || "";
+  const countryQuery = searchParams.get("country")?.toLowerCase() || "";
+  const priceParam = searchParams.get("price");
+  const maxPriceQuery = priceParam ? parseInt(priceParam) : null;
 
   // --- 2. DATA FETCHING ENGINE ---
   useEffect(() => {
@@ -116,7 +114,7 @@ export default function HomePage({ searchParams }: { searchParams: any }) {
 
     const unsubscribe = auth.onAuthStateChanged((user) => setIsAuthenticated(!!user));
     return () => unsubscribe();
-  }, []);
+  }, []); // Empty dependency array ensures this fires ONLY once on mount.
 
   const handleRestrictedClick = (e: React.MouseEvent, targetHref: string) => {
     if (!isAuthenticated) {
@@ -134,13 +132,18 @@ export default function HomePage({ searchParams }: { searchParams: any }) {
     let matchesPrice = true;
 
     if (searchQuery) {
-      const searchableText = `${hunt.title || ''} ${hunt.primarySpecies || ''} ${hunt.additionalSpecies || ''}`.toLowerCase();
+      const searchableText = `${hunt.title || ''} ${hunt.primarySpecies || ''} ${hunt.additionalSpecies || ''} ${Array.isArray(hunt.species) ? hunt.species.join(" ") : ""}`.toLowerCase();
       matchesQuery = searchableText.includes(searchQuery);
     }
-    if (locationQuery) {
-      const huntLocation = `${hunt.location || ''} ${hunt.province || ''}`.toLowerCase();
+    
+    // Prioritize strict country filter, fallback to broad location string matching
+    if (countryQuery) {
+      matchesLocation = hunt.country?.toLowerCase() === countryQuery;
+    } else if (locationQuery) {
+      const huntLocation = `${hunt.location || ''} ${hunt.country || ''} ${hunt.region || ''} ${hunt.province || ''}`.toLowerCase();
       matchesLocation = huntLocation.includes(locationQuery);
     }
+
     if (maxPriceQuery) {
       const huntPrice = hunt.price ?? hunt.basePrice ?? 0;
       matchesPrice = huntPrice <= maxPriceQuery;
@@ -152,9 +155,9 @@ export default function HomePage({ searchParams }: { searchParams: any }) {
   const featuredHunts = filteredHunts.filter(hunt => hunt.effectiveTier === "PRO").slice(0, 8);
   const standardHunts = filteredHunts.filter(hunt => hunt.effectiveTier !== "PRO").slice(0, 8);
 
-  const isSearching = searchQuery || locationQuery || maxPriceQuery;
+  const isSearching = searchQuery || locationQuery || countryQuery || maxPriceQuery;
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-olive"><KuduLoader /></div>;
+  if (loading) return <div className="min-h-[65vh] flex items-center justify-center bg-olive"><KuduLoader /></div>;
 
   return (
     <div className="flex-grow bg-olive">
@@ -244,5 +247,13 @@ export default function HomePage({ searchParams }: { searchParams: any }) {
 
       <MissionCard />
     </div>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-olive"><KuduLoader /></div>}>
+      <HomeContent />
+    </Suspense>
   );
 }

@@ -6,7 +6,7 @@ import { createHuntListing } from "@/app/actions/hunts";
 import { uploadWithCompression } from "@/lib/firebase/storageHelper";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, UploadCloud, X, Globe, MapPin } from "lucide-react";
+import { Loader2, UploadCloud, X, Globe, MapPin, Target } from "lucide-react";
 
 interface HuntCreatorProps {
   outfitterId: string;
@@ -21,6 +21,15 @@ const SUPPORTED_COUNTRIES = [
   "Mozambique"
 ];
 
+// STRICT ENUM: Matches the Hunter Search exact terminology
+const STANDARD_SPECIES = [
+  "Baboon", "Black Wildebeest", "Blesbok", "Blue Wildebeest", "Bushbuck", "Bushpig", 
+  "Cape Buffalo", "Caracal", "Crocodile", "Duiker", "Eland", "Elephant", "Gemsbok", 
+  "Giraffe", "Hippo", "Hyena", "Impala", "Jackal", "Klipspringer", "Kudu", "Leopard", 
+  "Lion", "Nyala", "Ostrich", "Red Hartebeest", "Reedbuck", "Rhino", "Roan", 
+  "Sable", "Springbok", "Steenbok", "Tsessebe", "Warthog", "Waterbuck", "Zebra"
+];
+
 export default function HuntCreator({ outfitterId, outfitterName }: HuntCreatorProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -28,18 +37,28 @@ export default function HuntCreator({ outfitterId, outfitterName }: HuntCreatorP
   const [images, setImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   
+  // New State for strictly managing species arrays
+  const [selectedSpecies, setSelectedSpecies] = useState<string[]>([]);
+
   const [formData, setFormData] = useState({
     title: "",
-    species: "",
     price: "",
     duration: "",
-    country: "South Africa", // Default to SA
-    region: "", // Specific province/concession
+    country: "South Africa", 
+    region: "", 
     description: "",
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const toggleSpecies = (species: string) => {
+    setSelectedSpecies(prev => 
+      prev.includes(species) 
+        ? prev.filter(s => s !== species)
+        : [...prev, species]
+    );
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -63,6 +82,10 @@ export default function HuntCreator({ outfitterId, outfitterName }: HuntCreatorP
       setError("Please upload at least one image for your listing.");
       return;
     }
+    if (selectedSpecies.length === 0) {
+      setError("Please select at least one target species.");
+      return;
+    }
 
     setLoading(true);
     setError("");
@@ -77,25 +100,27 @@ export default function HuntCreator({ outfitterId, outfitterName }: HuntCreatorP
         })
       );
 
-      // 2. Format data for the database with the new Regional split
+      // 2. Format data for the database with the strict arrays
       const huntData = {
         title: formData.title,
         outfitterName: outfitterName,
-        species: formData.species.split(",").map(s => s.trim()), 
+        species: selectedSpecies, 
+        primarySpecies: selectedSpecies[0], // The first selected becomes the display primary
         price: Number(formData.price),
         duration: formData.duration,
-        country: formData.country, // STRICT ENUM FOR SEARCH FILTERS
+        country: formData.country, 
         region: formData.region,
-        location: `${formData.region}, ${formData.country}`, // BACKWARD COMPATIBILITY STRING
+        location: `${formData.region}, ${formData.country}`, 
         description: formData.description,
         images: uploadedUrls,
+        coverImage: uploadedUrls[0], // Assign first image as cover for grid rendering
       };
 
       // 3. Save to Firestore via Server Action
       const result = await createHuntListing(huntData, outfitterId);
 
       if (result.success) {
-        router.push("/outfitter/dashboard");
+        router.push("/outfitter/dashboard/hunts");
       } else {
         setError(result.error || "Failed to create listing. Ensure your account is ACTIVE.");
         setLoading(false);
@@ -124,12 +149,33 @@ export default function HuntCreator({ outfitterId, outfitterName }: HuntCreatorP
           <Input name="title" required value={formData.title} onChange={handleChange} placeholder="e.g. 7-Day Premium Elephant Safari" className="h-12 dark:bg-stone-950 dark:border-stone-800" />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-bold text-stone-700 dark:text-stone-300 mb-1">Primary Species (Comma separated)</label>
-            <Input name="species" required value={formData.species} onChange={handleChange} placeholder="e.g. Elephant, Leopard, Buffalo" className="h-12 dark:bg-stone-950 dark:border-stone-800" />
-          </div>
+        {/* STRICT SPECIES SELECTOR */}
+        <div className="border border-stone-200 dark:border-stone-800 rounded-lg p-4 bg-stone-50 dark:bg-stone-900/30">
+          <label className="block text-sm font-bold text-stone-700 dark:text-stone-300 mb-2 flex items-center gap-1.5">
+            <Target className="h-4 w-4 text-kalahari"/> Target Species (Select all that apply)
+          </label>
+          <p className="text-xs text-stone-500 dark:text-stone-400 mb-3">The first species you select will be displayed as the primary target on the marketplace card.</p>
           
+          <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto custom-scrollbar p-1">
+            {STANDARD_SPECIES.map(species => (
+              <button
+                key={species}
+                type="button"
+                onClick={() => toggleSpecies(species)}
+                className={`px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wider transition-all border ${
+                  selectedSpecies.includes(species)
+                    ? "bg-kalahari border-kalahari text-white shadow-md"
+                    : "bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-700 text-stone-500 hover:border-kalahari/50"
+                }`}
+              >
+                {species}
+                {selectedSpecies[0] === species && <span className="ml-1 opacity-75">(Primary)</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
           <div>
             <label className="block text-sm font-bold text-stone-700 dark:text-stone-300 mb-1 flex items-center gap-1.5"><Globe className="h-4 w-4 text-kalahari"/> Country</label>
             <select
@@ -170,7 +216,7 @@ export default function HuntCreator({ outfitterId, outfitterName }: HuntCreatorP
             value={formData.description} 
             onChange={handleChange} 
             placeholder="Describe the accommodations, terrain, what's included, etc."
-            className="w-full rounded-md border border-stone-200 dark:border-stone-800 bg-transparent dark:bg-stone-950 px-3 py-2 text-sm shadow-sm placeholder:text-stone-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-800" 
+            className="w-full rounded-md border border-stone-200 dark:border-stone-800 bg-transparent dark:bg-stone-950 px-3 py-2 text-sm shadow-sm placeholder:text-stone-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-800 custom-scrollbar" 
           />
         </div>
       </div>
