@@ -3,11 +3,12 @@
 import { useState, useEffect } from "react";
 import { auth, db, storage } from "@/lib/firebase/client";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { 
   Save, User, MapPin, Home, Map, Medal, Image as ImageIcon, 
-  CheckCircle, Loader2, X, UploadCloud, AlertCircle 
+  CheckCircle, Loader2, X, UploadCloud, AlertCircle, Maximize2, FileText 
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import KuduLoader from "@/components/ui/KuduLoader";
 
 const ACCREDITATION_OPTIONS = [
@@ -37,6 +38,9 @@ export default function OutfitterSettingsPage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [error, setError] = useState("");
   const [uploadingImage, setUploadingImage] = useState(false);
+
+  // --- DRAWER STATE ---
+  const [activeDrawer, setActiveDrawer] = useState<"bio" | null>(null);
 
   // --- FORM STATE ---
   const [formData, setFormData] = useState({
@@ -241,13 +245,26 @@ export default function OutfitterSettingsPage() {
               />
             </div>
 
+            {/* BIO: FOCUS MODE UI */}
             <div className="md:col-span-2">
               <label className="block text-xs font-bold text-olive/60 dark:text-off-white/50 uppercase tracking-widest mb-2">About the Outfitter (Bio)</label>
-              <textarea 
-                name="bio" value={formData.bio} onChange={handleInputChange}
-                className="w-full h-32 bg-off-white dark:bg-stone-950 border border-kalahari/20 rounded-xl p-3 text-olive dark:text-white outline-none focus:ring-2 focus:ring-kalahari font-medium resize-none"
-                placeholder="Tell hunters about your history, your team, and what makes your safaris unique..."
-              />
+              <div className="bg-off-white dark:bg-stone-950 border border-kalahari/20 rounded-xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex-1 overflow-hidden">
+                  {formData.bio ? (
+                    <p className="text-olive dark:text-white/80 font-medium text-sm line-clamp-2 italic border-l-2 border-kalahari/50 pl-3">"{formData.bio}"</p>
+                  ) : (
+                    <p className="text-olive/40 dark:text-off-white/30 font-medium text-sm">No bio drafted yet.</p>
+                  )}
+                </div>
+                <Button 
+                  type="button" 
+                  variant="outline"
+                  onClick={() => setActiveDrawer("bio")}
+                  className="shrink-0 bg-white dark:bg-white/10 hover:bg-kalahari/10 dark:hover:bg-white/20 text-olive dark:text-white font-bold border-kalahari/30 dark:border-white/10 transition-colors"
+                >
+                  <Maximize2 className="h-4 w-4 mr-2 text-kalahari" /> Focus Editor
+                </Button>
+              </div>
             </div>
           </div>
         </section>
@@ -401,6 +418,63 @@ export default function OutfitterSettingsPage() {
         </div>
 
       </div>
+
+      {/* --- FOCUS MODE SLIDE-OUT DRAWER --- */}
+      {activeDrawer && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm transition-opacity">
+          <div className="w-full md:w-[600px] h-full bg-white dark:bg-stone-950 shadow-[-20px_0_50px_rgba(0,0,0,0.5)] border-l border-kalahari/20 flex flex-col animate-in slide-in-from-right duration-300">
+            
+            <div className="p-6 border-b border-kalahari/10 dark:border-white/5 flex justify-between items-center bg-off-white dark:bg-black/20">
+              <h3 className="text-xl font-black font-headline text-olive dark:text-white flex items-center gap-2">
+                <FileText className="h-5 w-5 text-kalahari" />
+                Draft Company Bio
+              </h3>
+              <button 
+                type="button" 
+                onClick={() => setActiveDrawer(null)}
+                className="p-2 hover:bg-kalahari/10 dark:hover:bg-white/10 rounded-full transition-colors text-olive/50 hover:text-olive dark:text-white/50 dark:hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 p-6 flex flex-col bg-white dark:bg-stone-900/50">
+              <p className="text-sm text-olive/60 dark:text-stone-400 mb-4">
+                Take your time. A detailed bio increases booking conversions by establishing history and trust.
+              </p>
+              
+              <textarea 
+                name="bio"
+                value={formData.bio}
+                onChange={handleInputChange}
+                className="flex-1 w-full bg-off-white dark:bg-black/40 border border-kalahari/20 text-olive dark:text-white focus:outline-none focus:border-kalahari focus:ring-1 focus:ring-kalahari font-medium text-base rounded-2xl p-6 shadow-inner resize-none custom-scrollbar leading-relaxed"
+                placeholder="Start typing your company history..."
+                autoFocus
+              />
+            </div>
+
+            <div className="p-6 border-t border-kalahari/10 dark:border-white/5 bg-off-white dark:bg-black/20 flex justify-end gap-4">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => setActiveDrawer(null)}
+                className="border-kalahari/30 text-olive dark:text-white hover:bg-kalahari/10 font-bold"
+              >
+                Close Editor
+              </Button>
+              <Button 
+                type="button" 
+                onClick={() => setActiveDrawer(null)}
+                className="bg-kalahari hover:bg-kalahari/90 text-white dark:text-olive font-black"
+              >
+                <CheckCircle className="h-4 w-4 mr-2" /> Done Drafting
+              </Button>
+            </div>
+            
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

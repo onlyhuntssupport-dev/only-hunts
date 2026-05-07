@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { adminDb } from "@/lib/firebase/admin";
-import { FieldValue } from "firebase-admin/firestore"; // <-- ADDED THIS IMPORT
+import { FieldValue } from "firebase-admin/firestore";
 
 // Utility to prevent Next.js Client Component crash from Firestore Timestamps
 function serializeFirestoreData(obj: any): any {
@@ -33,8 +33,10 @@ export async function getAds() {
 
 export async function getActiveAdsByPlacement(placement: string) {
   try {
+    // Only fetch ads that are both ACTIVE and fully PAID
     const snapshot = await adminDb.collection("sponsoredAds")
       .where("isActive", "==", true)
+      .where("paymentStatus", "==", "PAID")
       .where("placement", "==", placement)
       .get();
       
@@ -58,19 +60,30 @@ export async function createAd(formData: FormData) {
       advertiserName,
       imageUrl: formData.get("imageUrl") as string || "",
       targetUrl: formData.get("targetUrl") as string || "",
-      placement: formData.get("placement") as string || "IN_FEED", // IN_FEED, CHECKOUT, SEARCH_TOP
-      isActive: true,
+      placement: formData.get("placement") as string || "IN_FEED",
+      
+      // Financial Tracking Fields
+      billingAmount: Number(formData.get("billingAmount")) || 0,
+      billingEmail: formData.get("billingEmail") as string || "",
+      billingCycle: formData.get("billingCycle") as string || "ONE_TIME",
+      
+      // Safety Defaults: Starts inactive and pending payment
+      paymentStatus: "PENDING_PAYMENT",
+      isActive: false, 
+      
       clicks: 0,
       impressions: 0,
       createdAt: new Date().toISOString()
     };
 
-    await adminDb.collection("sponsoredAds").add(newDoc);
+    const docRef = await adminDb.collection("sponsoredAds").add(newDoc);
     
     revalidatePath("/admin/ads");
     revalidatePath("/");
     revalidatePath("/marketplace");
-    return { success: true };
+    
+    // RETURN FIX: Added 'id' alongside 'adId' so the UI correctly routes it to Paystack
+    return { success: true, id: docRef.id, adId: docRef.id };
   } catch (error: any) {
     console.error("Error creating ad:", error);
     return { success: false, error: error.message };
@@ -90,9 +103,17 @@ export async function deleteAd(id: string) {
   }
 }
 
-export async function toggleAdStatus(id: string, currentStatus: boolean) {
+export async function toggleAdStatus(id: string, currentStatus: boolean, updatePaymentToPaid: boolean = false) {
   try {
-    await adminDb.collection("sponsoredAds").doc(id).update({ isActive: !currentStatus });
+    const updateData: any = { isActive: !currentStatus };
+    
+    // If the admin manually forces a pending ad to go live, flip it to PAID
+    if (updatePaymentToPaid) {
+      updateData.paymentStatus = "PAID";
+    }
+
+    await adminDb.collection("sponsoredAds").doc(id).update(updateData);
+    
     revalidatePath("/admin/ads");
     revalidatePath("/");
     revalidatePath("/marketplace");
@@ -107,7 +128,7 @@ export async function recordAdClick(id: string) {
   try {
     const adRef = adminDb.collection("sponsoredAds").doc(id);
     await adRef.update({
-      clicks: FieldValue.increment(1) // <-- FIXED
+      clicks: FieldValue.increment(1)
     });
     return { success: true };
   } catch (error: any) {
@@ -120,7 +141,7 @@ export async function recordAdImpression(id: string) {
   try {
     const adRef = adminDb.collection("sponsoredAds").doc(id);
     await adRef.update({
-      impressions: FieldValue.increment(1) // <-- FIXED
+      impressions: FieldValue.increment(1) 
     });
     return { success: true };
   } catch (error: any) {

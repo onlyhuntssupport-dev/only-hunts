@@ -5,7 +5,7 @@ import { adminDb, adminAuth } from "@/lib/firebase/admin";
 import { sendPlatformEmail } from "@/lib/email/sender";
 
 // ============================================================================
-// UTILITY: FIRESTORE SERIALIZER (Prevents Next.js Boundary Crash)
+// UTILITY: FIRESTORE SERIALIZER
 // ============================================================================
 function serializeFirestoreData(obj: any): any {
   if (obj === null || obj === undefined) return obj;
@@ -150,8 +150,8 @@ export async function verifyOutfitter(outfitterId: string, performedBy: string) 
     
     await logAdminAction("VERIFY_OUTFITTER", outfitterId, performedBy, { newStatus: "VERIFIED" });
 
-    revalidatePath("/admin");
     revalidatePath("/admin/outfitters");
+    revalidatePath(`/admin/outfitters/${outfitterId}`);
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -181,7 +181,8 @@ export async function suspendUser(userId: string, performedBy: string) {
 
     await logAdminAction("SUSPEND_USER", userId, performedBy, { newStatus: "SUSPENDED" });
 
-    revalidatePath("/admin");
+    revalidatePath("/admin/outfitters");
+    revalidatePath(`/admin/outfitters/${userId}`);
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -196,7 +197,8 @@ export async function reinstateUser(userId: string, performedBy: string) {
 
     await logAdminAction("REINSTATE_USER", userId, performedBy, { newStatus: "VERIFIED" });
 
-    revalidatePath("/admin");
+    revalidatePath("/admin/outfitters");
+    revalidatePath(`/admin/outfitters/${userId}`);
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -263,6 +265,20 @@ export async function getGlobalEntities(type: "outfitter" | "hunter") {
   }
 }
 
+// NEW: Fetch a single outfitter for the dedicated detail page
+export async function getOutfitterById(id: string) {
+  try {
+    const docSnap = await adminDb.collection("outfitters").doc(id).get();
+    if (!docSnap.exists) {
+      return { success: false, error: "Outfitter not found" };
+    }
+    return { success: true, data: serializeFirestoreData({ id: docSnap.id, ...docSnap.data() }) };
+  } catch (error: any) {
+    console.error("Error fetching single outfitter:", error);
+    return { success: false, error: "Failed to load outfitter details" };
+  }
+}
+
 // ============================================================================
 // 4. READ-ONLY DATA INSPECTOR
 // ============================================================================
@@ -285,7 +301,7 @@ export async function getEntityActivity(userId: string, role: string) {
 }
 
 // ============================================================================
-// 5. ACCOUNTING & LEDGER MODULE (NEW)
+// 5. ACCOUNTING & LEDGER MODULE
 // ============================================================================
 
 export async function getFinancialLedger() {
@@ -365,5 +381,45 @@ export async function getAuditLogs(limitCount = 200) {
     return { success: true, data: serializeFirestoreData(logs) };
   } catch (err: any) {
     return { success: false, error: "Failed to fetch audit logs." };
+  }
+}
+
+// ============================================================================
+// 8. OUTFITTER FINANCIAL & TIER OVERRIDES
+// ============================================================================
+
+export async function updateOutfitterFinancials(outfitterId: string, payload: any, performedBy: string = "System Admin") {
+  try {
+    const updateData = {
+      tier: payload.tier || "standard",
+      promoCommissionRate: payload.promoCommissionRate ?? null,
+      promoSubscriptionRate: payload.promoSubscriptionRate ?? null,
+      promoExpiresAt: payload.promoExpiresAt ?? null,
+      updatedAt: new Date().toISOString()
+    };
+
+    await adminDb.collection("outfitters").doc(outfitterId).update(updateData);
+    
+    await adminDb.collection("users").doc(outfitterId).update({
+      tier: updateData.tier,
+      promoCommissionRate: updateData.promoCommissionRate,
+      promoSubscriptionRate: updateData.promoSubscriptionRate,
+      promoExpiresAt: updateData.promoExpiresAt,
+      updatedAt: updateData.updatedAt
+    });
+
+    await logAdminAction("OVERRIDE_FINANCIALS", outfitterId, performedBy, {
+      tier: updateData.tier,
+      commission: updateData.promoCommissionRate,
+      subscription: updateData.promoSubscriptionRate,
+      expires: updateData.promoExpiresAt
+    });
+
+    revalidatePath("/admin/outfitters");
+    revalidatePath(`/admin/outfitters/${outfitterId}`);
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error updating outfitter financials:", error);
+    return { success: false, error: error.message };
   }
 }

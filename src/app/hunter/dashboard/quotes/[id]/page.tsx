@@ -1,14 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation'; // <-- This is the magic import that fixes the ghost page
+import { useRouter } from 'next/navigation';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore'; 
-import { db } from '@/lib/firebase/client';
+import { db, auth } from '@/lib/firebase/client';
 import { declineCustomQuote } from '@/lib/firebase/quoteService'; 
+import { initializeHuntBooking } from '@/app/actions/paystack'; // NEW: Import the payment gateway
 
 // Mocking the initial data fetch for UI building purposes. 
 const mockQuote = {
   id: 'quote_98765',
+  outfitterId: 'mock_outfitter_id_123', // Added so the payment gateway has a destination
   outfitterName: 'Bushveld Safaris',
   status: 'PENDING_HUNTER_ACCEPTANCE',
   logistics: { days: 7, hunters: 2, observers: 1 },
@@ -25,7 +27,7 @@ const mockQuote = {
 };
 
 export default function HunterQuoteReviewPage() {
-  const router = useRouter(); // <-- Initializes the router
+  const router = useRouter(); 
   const [quote, setQuote] = useState(mockQuote);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [signature, setSignature] = useState('');
@@ -34,15 +36,21 @@ export default function HunterQuoteReviewPage() {
   // The LIVE Acceptance Function
   const handleAcceptQuote = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!auth.currentUser?.email || !auth.currentUser?.uid) {
+      alert("Please log in to accept this quote.");
+      return;
+    }
+
     setIsProcessing(true);
 
     try {
       const outfitterEmail = 'admin@bushveldsafaris.com'; 
       
+      // 1. Write digital signature to Firestore to formally accept the terms
       const quoteRef = doc(db, 'quotes', quote.id);
-      
       await setDoc(quoteRef, {
-        status: 'ACCEPTED',
+        status: 'ACCEPTED_AWAITING_DEPOSIT', // Updated status to reflect pending payment
         acceptedBy: signature,
         outfitterEmail: outfitterEmail,
         acceptedAt: serverTimestamp(),
@@ -53,10 +61,55 @@ export default function HunterQuoteReviewPage() {
         terms: quote.terms,
       }, { merge: true });
 
-      alert("Congratulations! Your safari is officially booked. The outfitter has been notified.");
-      
-      // <-- REDIRECTS THE HUNTER AWAY UPON ACCEPTANCE
-      router.push('/hunter/dashboard'); 
+      // --- 2. EMAIL ENGINE DISPATCH (SILENT FAILSAFE) ---
+      try {
+        const idToken = await auth.currentUser.getIdToken(true);
+        const hunterName = auth.currentUser.displayName || signature || "Your client";
+
+        await fetch("/api/email", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${idToken}`
+          },
+          body: JSON.stringify({
+            to: outfitterEmail,
+            subject: `Quote Accepted: ${hunterName} Locked In`,
+            userName: quote.outfitterName,
+            title: "Safari Booking Confirmed!",
+            message: `Great news! ${hunterName} has accepted your custom quote and digitally signed the terms. The booking for $${quote.financials.totalUsd.toLocaleString()} USD is now locked in. Log in to your dashboard to view the final itinerary and prepare for their arrival.`,
+            ctaText: "View Confirmed Booking",
+            ctaLink: "https://www.only-hunts.com/outfitter/dashboard",
+          }),
+        });
+      } catch (emailErr) {
+        console.error("Silent failure: Email engine dropped the outfitter notification", emailErr);
+      }
+
+      // --- 3. PAYSTACK PAYMENT GATEWAY INIT ---
+      // We assume a standard 30% deposit for custom quotes unless specified otherwise
+      const depositPct = 30; 
+      const depositDueUSD = quote.financials.totalUsd * (depositPct / 100);
+      const EXCHANGE_RATE = 19.00; // Fixed estimate for ZAR conversion
+      const amountCentsZAR = depositDueUSD * EXCHANGE_RATE * 100;
+
+      const res = await initializeHuntBooking(
+        auth.currentUser.email,
+        quote.id, // Custom Quotes use their Quote ID as the Hunt ID for tracking
+        quote.outfitterId, 
+        amountCentsZAR,
+        quote.financials.totalUsd,
+        depositPct,
+        auth.currentUser.uid, // NEW: Passed to webhook for receipt generation
+        `Custom Safari Quote: ${quote.outfitterName}` // NEW: Passed to webhook for PDF Title
+      );
+
+      // Redirect directly to Paystack to secure the deposit
+      if (res.authorizationUrl) {
+        window.location.href = res.authorizationUrl;
+      } else {
+        throw new Error("Failed to retrieve payment URL");
+      }
       
     } catch (error: any) {
       console.error("Error accepting quote:", error);
@@ -76,7 +129,6 @@ export default function HunterQuoteReviewPage() {
            declinedAt: serverTimestamp(),
          }, { merge: true });
          
-         // <-- REDIRECTS THE HUNTER AWAY UPON DECLINE (KILLS THE GHOST PAGE)
          router.push('/hunter/dashboard'); 
       } catch (error) {
         console.error("Error declining quote:", error);
@@ -99,7 +151,7 @@ export default function HunterQuoteReviewPage() {
         </div>
         <div className="mt-4 md:mt-0 text-right">
           <span className={`inline-block rounded-full px-4 py-1.5 text-sm font-bold ${
-            quote.status === 'ACCEPTED' ? 'bg-green-500/20 text-green-400 border border-green-500/50' : 
+            quote.status.includes('ACCEPTED') ? 'bg-green-500/20 text-green-400 border border-green-500/50' : 
             quote.status === 'DECLINED' ? 'bg-red-500/20 text-red-400 border border-red-500/50' : 
             'bg-orange-500/20 text-orange-400 border border-orange-500/50'
           }`}>
@@ -224,7 +276,7 @@ export default function HunterQuoteReviewPage() {
               disabled={!termsAccepted || signature.length < 3 || isProcessing}
               className="w-2/3 rounded-lg bg-orange-600 py-4 font-bold text-white transition-all hover:bg-orange-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-500 shadow-[0_0_15px_rgba(249,115,22,0.3)] hover:shadow-[0_0_25px_rgba(249,115,22,0.5)]"
             >
-              {isProcessing ? "Processing..." : "Accept & Lock Booking"}
+              {isProcessing ? "Processing..." : "Accept & Pay Deposit"}
             </button>
           </div>
         </form>

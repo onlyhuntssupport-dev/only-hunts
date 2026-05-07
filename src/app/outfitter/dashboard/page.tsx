@@ -19,7 +19,8 @@ interface Stats {
   activeHunts: number;
   pendingHunts: number;
   totalInquiries: number;
-  tier?: string; // Capture the subscription tier
+  tier?: string; 
+  promoExpiresAt?: string; // Added to interface for evaluation
 }
 
 export default function DashboardOverview() {
@@ -129,13 +130,13 @@ export default function DashboardOverview() {
     return <KuduLoader />;
   }
 
-  // Determine PRO status from Firestore tier
-  const isPro = stats?.tier === "pro" || stats?.tier === "PRO" || profileProgress.isPremium;
+  // FIXED: Synchronized evaluation logic to match the backend and storefront
+  const isPromoActive = stats?.promoExpiresAt && new Date(stats.promoExpiresAt) > new Date();
+  const isPro = stats?.tier?.toUpperCase() === "PRO" || isPromoActive || profileProgress.isPremium;
 
   return (
     <div className="relative min-h-screen pt-8 px-4 sm:px-6 lg:px-8 pb-20">
       
-      {/* Background Image Setup */}
       <div className="absolute inset-0 z-0 h-full w-full pointer-events-none overflow-hidden">
         <Image
           src="/outfitter-bg.jpg" 
@@ -148,10 +149,9 @@ export default function DashboardOverview() {
         <div className="absolute inset-0 bg-black/[0.65] backdrop-blur-[2px]" />
       </div>
 
-      {/* Main Dashboard Content */}
       <div className="space-y-10 max-w-6xl mx-auto relative z-10">
         
-        {/* HEADER SECTION WITH PREMIUM WIDGET */}
+        {/* HEADER SECTION */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-b-2 border-kalahari/20 pb-6">
           <div>
             <h1 className="text-4xl font-headline font-bold text-off-white tracking-tight">Dashboard Overview</h1>
@@ -160,7 +160,6 @@ export default function DashboardOverview() {
             </p>
           </div>
 
-          {/* Premium Outfitter Progress Widget */}
           <div className="shrink-0 w-full md:w-80">
             {isPro ? (
               <div className="bg-gradient-to-r from-amber-500/20 to-amber-700/10 border border-amber-500/50 rounded-xl p-4 flex items-center gap-4 shadow-lg backdrop-blur-md">
@@ -181,13 +180,11 @@ export default function DashboardOverview() {
                   <span className="text-kalahari font-black text-xs">{profileProgress.steps}/{profileProgress.total} Steps</span>
                 </div>
                 
-                {/* Diplomatic Tooltip */}
                 <div className="absolute top-full right-0 mt-2 w-72 p-4 bg-stone-900 border border-kalahari/50 rounded-xl shadow-2xl text-xs text-left text-white/90 font-medium opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-300 pointer-events-none z-[60]">
                   <strong className="block text-kalahari mb-1 text-sm font-black">Maximize Your Visibility</strong>
                   Hunters are 3x more likely to book with outfitters who have full profiles. To guarantee the best experience for our hunters, Only-Hunts prioritizes Premium Outfitters in search results. Complete your profile to unlock your Gold Badge and maximize your visibility!
                 </div>
 
-                {/* Progress Bar */}
                 <div className="w-full bg-white/10 h-2.5 rounded-full overflow-hidden mb-4 shadow-inner">
                   <div 
                     className="bg-kalahari h-full transition-all duration-1000 ease-out" 
@@ -205,7 +202,7 @@ export default function DashboardOverview() {
           </div>
         </div>
 
-        {/* --- PROMINENT PENDING BANNER --- */}
+        {/* PENDING BANNER */}
         {stats?.status === "PENDING" && (
           <div className="bg-amber-500/10 border-2 border-amber-500/40 p-6 rounded-xl flex items-start gap-5 shadow-lg backdrop-blur-md relative overflow-hidden">
             <div className="absolute top-0 left-0 w-1.5 h-full bg-amber-500"></div>
@@ -220,25 +217,13 @@ export default function DashboardOverview() {
           </div>
         )}
 
-        {stats?.status === "SUSPENDED" && (
-          <div className="bg-red-900/20 border border-red-800/50 p-6 rounded-xl flex items-start gap-4 shadow-sm backdrop-blur-md">
-            <ShieldAlert className="h-6 w-6 text-red-500 shrink-0 mt-0.5" />
-            <div>
-              <h3 className="text-lg font-bold text-red-400">Account Suspended</h3>
-              <p className="text-red-400/80 mt-1 font-medium">
-                Your platform access has been suspended and your listings are hidden. Please contact support to resolve this issue.
-              </p>
-            </div>
-          </div>
-        )}
-
+        {/* PRO FEATURE WIDGETS */}
         <div className="flex flex-col gap-6 w-full mb-6">
           <div className="relative w-full z-20">
-            {/* DYNAMIC REDIRECT: Go to tools if PRO, go to billing if Standard */}
-            <Link href={isPro ? "/outfitter/dashboard/only-quotes" : "/outfitter/billing"} className="group block w-full relative">
+            {/* FIXED: Link updated to point to /tiers conversion page */}
+            <Link href={isPro ? "/outfitter/dashboard/only-quotes" : "/outfitter/tiers"} className="group block w-full relative">
               <div className={`bg-black/60 backdrop-blur-md rounded-3xl relative border-4 shadow-xl transition-colors ${isPro ? "border-orange-500 hover:border-orange-400" : "border-stone-800 hover:border-orange-500"}`}>
                 
-                {/* PRO LOCKED BADGE */}
                 {!isPro && (
                   <div className="absolute top-5 left-6 z-50 flex items-center gap-1.5 bg-stone-900/90 backdrop-blur-md px-3 py-1.5 rounded-full border border-stone-700 shadow-md">
                     <Lock className="h-4 w-4 text-stone-400 group-hover:text-orange-500 transition-colors" />
@@ -277,7 +262,8 @@ export default function DashboardOverview() {
                 </h2>
               </div>
               <div className="shrink-0 w-full md:w-auto flex flex-col sm:flex-row gap-4">
-                <Link href={isPro ? "/outfitter/dashboard/custom-quotes?tab=pending" : "/outfitter/billing"} className="w-full sm:w-auto">
+                {/* FIXED: Link updated to point to /tiers conversion page */}
+                <Link href={isPro ? "/outfitter/dashboard/custom-quotes?tab=pending" : "/outfitter/tiers"} className="w-full sm:w-auto">
                   <div className={`bg-black/40 hover:bg-black/60 font-black text-sm h-12 px-6 rounded-xl shadow-sm hover:-translate-y-0.5 transition-all flex items-center justify-between gap-4 w-full border-2 ${isPro ? "text-white border-orange-500" : "text-stone-500 border-stone-700 hover:border-orange-500 hover:text-white"}`}>
                     <span className="flex items-center gap-2">
                       <AlertCircle className={`h-4 w-4 ${isPro ? "text-orange-400" : "text-stone-500"}`} /> Action Required
@@ -287,7 +273,8 @@ export default function DashboardOverview() {
                     </span>
                   </div>
                 </Link>
-                <Link href={isPro ? "/outfitter/dashboard/custom-quotes?tab=accepted" : "/outfitter/billing"} className="w-full sm:w-auto">
+                {/* FIXED: Link updated to point to /tiers conversion page */}
+                <Link href={isPro ? "/outfitter/dashboard/custom-quotes?tab=accepted" : "/outfitter/tiers"} className="w-full sm:w-auto">
                   <div className={`bg-black/40 hover:bg-black/60 font-black text-sm h-12 px-6 rounded-xl shadow-sm hover:-translate-y-0.5 transition-all flex items-center justify-between gap-4 w-full border-2 ${isPro ? "text-white border-orange-500" : "text-stone-500 border-stone-700 hover:border-orange-500 hover:text-white"}`}>
                     <span className="flex items-center gap-2">
                       <CheckCircle className={`h-4 w-4 ${isPro ? "text-orange-400" : "text-stone-500"}`} /> Accepted
@@ -302,7 +289,7 @@ export default function DashboardOverview() {
           </div>
         </div>
 
-        {/* Standard Grid Elements (Hunts, Messages, Inquiries, etc) remain unchanged */}
+        {/* GRID STATS */}
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
           <Link href="/messages" className="group block h-full">
             <Card className="border-kalahari/40 shadow-sm transition-all bg-black/60 backdrop-blur-md group-hover:border-kalahari group-hover:-translate-y-1 group-hover:shadow-lg h-full cursor-pointer flex flex-col justify-between">
@@ -390,7 +377,6 @@ export default function DashboardOverview() {
               Start reaching hunters globally by adding a new, premium hunting package to the Only-Hunts marketplace.
             </p>
             
-            {/* CTA Logc */}
             {stats?.status === "SUSPENDED" ? (
               <Button size="lg" disabled className="opacity-50 cursor-not-allowed bg-red-900/50 text-red-200 font-bold h-12 px-8">
                 Account Suspended <ShieldAlert className="ml-2 h-5 w-5" />

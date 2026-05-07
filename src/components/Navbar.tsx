@@ -279,7 +279,7 @@ export default function Navbar() {
                                   <Target className="h-4 w-4 mr-3 text-kalahari" /> My Bookings
                                 </Link>
                                 <Link 
-                                  href="/hunter/wishlist" 
+                                  href="/hunter/dashboard/wishlist" 
                                   onClick={() => setDropdownOpen(false)}
                                   className="flex items-center px-3 py-2 text-sm font-bold text-olive dark:text-off-white/80 hover:text-olive dark:hover:text-kalahari hover:bg-kalahari/10 rounded-lg transition-colors"
                                 >

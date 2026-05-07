@@ -27,7 +27,6 @@ export default function OutfitterStorefront({ params }: Props) {
   const [hunts, setHunts] = useState<any[]>([]);
   const [error, setError] = useState("");
   
-  // NEW: State for booked dates
   const [bookedDates, setBookedDates] = useState<{start: string, end: string}[]>([]);
 
   const [activeTab, setActiveTab] = useState<'overview' | 'packages' | 'gallery'>('overview');
@@ -42,12 +41,15 @@ export default function OutfitterStorefront({ params }: Props) {
         const res = await getOutfitterProfileData(outfitterId);
         
         if (res.success && res.outfitter) {
-          // OVERRIDE: Tell TypeScript to trust the shape of our Firestore document
           const outfitterData = res.outfitter as any; 
+          
+          // STRICT TIER EVALUATION: Matches backend Iron Gate
+          const isPromoActive = outfitterData.promoExpiresAt && new Date(outfitterData.promoExpiresAt) > new Date();
+          const effectiveTier = (isPromoActive || outfitterData.tier === "PRO" || outfitterData.tier === "pro") ? "PRO" : "STANDARD";
           
           setOutfitter({
             ...outfitterData,
-            isPro: outfitterData.isPro !== false,
+            effectiveTier, // Saves the strict evaluated tier to state
             accreditations: outfitterData.accreditations || [],
             gallery: outfitterData.gallery || [],
             campType: outfitterData.campType || "Premium Safari Lodge",
@@ -62,7 +64,7 @@ export default function OutfitterStorefront({ params }: Props) {
         } else {
           setError(res.error || "Profile Unavailable");
           setLoading(false);
-          return; // Stop execution if main profile fails
+          return; 
         }
       } catch (err) {
         console.error("Error fetching storefront profile:", err);
@@ -71,7 +73,7 @@ export default function OutfitterStorefront({ params }: Props) {
         return;
       }
 
-      // BLOCK 2: Fetch Booked Dates (Isolated so it doesn't break profile load on permission error)
+      // BLOCK 2: Fetch Booked Dates
       try {
         const extractedDates: {start: string, end: string}[] = [];
         
@@ -96,8 +98,7 @@ export default function OutfitterStorefront({ params }: Props) {
 
         setBookedDates(extractedDates);
       } catch (err) {
-        console.warn("Could not fetch booked dates (likely Firestore security rules). Falling back to empty array.", err);
-        // Do not set error state here; allow profile to render
+        console.warn("Could not fetch booked dates. Falling back to empty array.", err);
       } finally {
         setLoading(false);
       }
@@ -321,12 +322,20 @@ export default function OutfitterStorefront({ params }: Props) {
               </div>
 
               <div className="space-y-4">
-                {outfitter.isPro && (
+                {/* CONDITIONAL PAYWALL RENDER */}
+                {outfitter.effectiveTier === "PRO" ? (
                   <Button 
                     onClick={() => setIsQuoteModalOpen(true)}
                     className="w-full bg-orange-600 hover:bg-orange-700 text-white font-black py-6 text-base rounded-xl shadow-[0_0_15px_rgba(249,115,22,0.3)] transition-all"
                   >
                     Request Custom Quote
+                  </Button>
+                ) : (
+                  <Button 
+                    onClick={() => setActiveTab('packages')}
+                    className="w-full bg-kalahari hover:bg-kalahari/90 text-white font-black py-6 text-base rounded-xl shadow-[0_0_15px_rgba(209,164,123,0.3)] transition-all"
+                  >
+                    View Available Packages
                   </Button>
                 )}
                 
@@ -362,7 +371,6 @@ export default function OutfitterStorefront({ params }: Props) {
         </div>
       </div>
 
-      {/* NEW: Passed bookedDates down to the Modal */}
       <CustomQuoteModal 
         isOpen={isQuoteModalOpen} 
         onClose={() => setIsQuoteModalOpen(false)} 

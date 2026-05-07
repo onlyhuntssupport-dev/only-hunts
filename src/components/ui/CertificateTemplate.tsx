@@ -125,6 +125,7 @@ export default function CertificateTemplate({ outfitterName, verificationYear }:
           
           <View style={styles.topSection}>
             {/* New: The old placeholder is gone. We use the provided kudu skull image, now Base64 encoded for maximum reliability. */}
+            {/* eslint-disable-next-line jsx-a11y/alt-text */}
             <Image 
               src={`data:image/png;base64,${kuduLogoBase64}`} 
               style={styles.logo}

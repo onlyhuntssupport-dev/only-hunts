@@ -1,8 +1,6 @@
-// Module 30: Paystack Webhook to Firebase Firestore
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
-// Note: Ensure your Firebase Admin SDK is initialized in your project before calling getFirestore()
 
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY!;
 
@@ -23,18 +21,18 @@ export async function POST(req: Request) {
     const event = JSON.parse(body);
     const db = getFirestore();
 
-    // Handle successful subscription charge
     if (event.event === 'charge.success') {
       const { metadata, customer } = event.data;
       
-      if (metadata?.outfitterId) {
+      // ====================================================================
+      // FLOW A: OUTFITTER SUBSCRIPTION UPGRADE
+      // ====================================================================
+      if (metadata?.type === 'subscription' && metadata?.outfitterId) {
         const outfitterRef = db.collection('outfitters').doc(metadata.outfitterId);
         
-        // Calculate 30 days from now for the subscription cycle
         const expirationDate = new Date();
         expirationDate.setDate(expirationDate.getDate() + 30);
 
-        // Update the Firestore document with the required fields
         await outfitterRef.update({
           tier: 'pro_tier',
           paystackCustomerCode: customer.customer_code,
@@ -42,14 +40,60 @@ export async function POST(req: Request) {
           isAdminOverride: false
         });
         
-        console.log(`Updated outfitter ${metadata.outfitterId} to Pro Tier in Firestore`);
+        console.log(`Updated outfitter ${metadata.outfitterId} to Pro Tier`);
+      }
+
+      // ====================================================================
+      // FLOW B: HUNTER DEPOSIT (PACKAGES & CUSTOM QUOTES)
+      // ====================================================================
+      if (metadata?.type === 'deposit') {
+        const depositPaidUSD = (metadata.totalPriceUSD * metadata.depositPct) / 100;
+        const balanceDueUSD = metadata.totalPriceUSD - depositPaidUSD;
+
+        // Fetch Hunt Title to ensure it's saved on the receipt
+        let huntTitle = metadata.huntTitle || 'Custom Safari Package';
+        if (!metadata.huntTitle && metadata.huntId) {
+           const huntDoc = await db.collection('hunts').doc(metadata.huntId).get();
+           if (huntDoc.exists) huntTitle = huntDoc.data()?.title || huntTitle;
+        }
+
+        const bookingData = {
+          hunterId: metadata.hunterId, // Must be passed in metadata from frontend
+          outfitterId: metadata.outfitterId,
+          huntId: metadata.huntId,
+          huntTitle: huntTitle,
+          totalPriceUSD: metadata.totalPriceUSD,
+          depositPaidUSD: depositPaidUSD,
+          balanceDueUSD: balanceDueUSD,
+          status: 'DEPOSIT_SECURED',
+          paystackReference: event.data.reference,
+          createdAt: Timestamp.now(),
+        };
+
+        // Write the receipt to the bookings collection
+        await db.collection('bookings').add(bookingData);
+        console.log(`Successfully generated booking receipt for hunter ${metadata.hunterId}`);
+      }
+
+      // ====================================================================
+      // FLOW C: BRAND AD SPONSORSHIPS
+      // ====================================================================
+      if (metadata?.type === 'ad_sponsor' && metadata?.campaignId) {
+        const campaignRef = db.collection('sponsored_hunts').doc(metadata.campaignId);
+        
+        await campaignRef.update({
+          status: 'active',
+          paidAt: Timestamp.now(),
+          paystackReference: event.data.reference
+        });
+        
+        console.log(`Successfully activated ad campaign ${metadata.campaignId} for sponsor ${metadata.sponsorId}`);
       }
     }
 
     // Handle subscription cancellation
     if (event.event === 'subscription.disable') {
        const { customer } = event.data;
-       // Query Firestore for the outfitter using the customer code and revert tier
        const snapshot = await db.collection('outfitters').where('paystackCustomerCode', '==', customer.customer_code).get();
        if (!snapshot.empty) {
          const doc = snapshot.docs[0];

@@ -58,7 +58,7 @@ function QuoteBoardContent() {
       setDoc(doc(db, selectedQuote.sourceCollection, selectedQuote.id), { outfitterRead: true }, { merge: true });
       setQuotes(prev => prev.map(q => q.id === selectedQuote.id ? { ...q, outfitterRead: true } : q));
     }
-  }, [selectedQuote?.id]);
+  }, [selectedQuote]);
 
   const filteredQuotes = quotes.filter(q => {
     if (activeTab === "archived") return q.outfitterArchived;

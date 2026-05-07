@@ -34,7 +34,7 @@ export async function updateHuntStatus(huntId: string, status: "APPROVED" | "REJ
     });
 
     revalidatePath("/dashboard/hunts");
-    revalidatePath("/"); // NEW: Forces the homepage to refresh its snapshot!
+    revalidatePath("/"); // Forces the homepage to refresh its snapshot!
     
     return { success: true };
   } catch (error: any) {
@@ -68,11 +68,40 @@ export async function createHuntListing(huntData: any, outfitterId: string) {
   try {
     const outfitterDoc = await adminDb.collection("outfitters").doc(outfitterId).get();
     
-    // Security check: Only ACTIVE outfitters can post
-    if (!outfitterDoc.exists || outfitterDoc.data()?.status !== "ACTIVE") {
-      return { success: false, error: "Your account must be ACTIVE to publish listings." };
+    if (!outfitterDoc.exists) {
+      return { success: false, error: "Outfitter profile not found." };
     }
 
+    const outfitter = outfitterDoc.data()!;
+
+    // 1. Core Security Check: Must be VERIFIED or ACTIVE
+    if (outfitter.status !== "ACTIVE" && outfitter.status !== "VERIFIED") {
+      return { success: false, error: "Your account must be VERIFIED to publish listings." };
+    }
+
+    // 2. Tier Evaluation Engine
+    const isPromoActive = outfitter.promoExpiresAt && new Date(outfitter.promoExpiresAt) > new Date();
+    // If they have an active promo OR they have paid for PRO, they are PRO.
+    const effectiveTier = (isPromoActive || outfitter.tier === "PRO" || outfitter.tier === "pro") ? "PRO" : "STANDARD";
+
+    // 3. The Iron Gate: Enforce the 5-Hunt Cap for Standard Users
+    if (effectiveTier === "STANDARD") {
+      // Query their current listings that are not rejected or deleted
+      const existingHuntsSnap = await adminDb.collection("hunts")
+        .where("outfitterId", "==", outfitterId)
+        .where("status", "in", ["ACTIVE", "APPROVED", "PENDING"])
+        .get();
+
+      if (existingHuntsSnap.size >= 5) {
+        return { 
+          success: false, 
+          error: "TIER_LIMIT_REACHED",
+          message: "Standard accounts are limited to 5 active listings. Upgrade to PRO to publish an unlimited catalog." 
+        };
+      }
+    }
+
+    // 4. Construct and Save the Hunt
     const newHunt = {
       ...huntData,
       outfitterId,
@@ -83,7 +112,7 @@ export async function createHuntListing(huntData: any, outfitterId: string) {
 
     const docRef = await adminDb.collection("hunts").add(newHunt);
 
-    // Increment outfitter's total listings stat
+    // 5. Increment outfitter's total listings stat
     await adminDb.collection("outfitters").doc(outfitterId).update({
       totalListings: FieldValue.increment(1)
     });
@@ -99,7 +128,7 @@ export async function createHuntListing(huntData: any, outfitterId: string) {
   }
 }
 
-// --- NEW FUNCTION: PERMANENTLY DELETE A HUNT & ITS IMAGES ---
+// --- PERMANENTLY DELETE A HUNT & ITS IMAGES ---
 export async function deleteHunt(huntId: string) {
   try {
     const huntDoc = await adminDb.collection("hunts").doc(huntId).get();
@@ -147,7 +176,7 @@ export async function deleteHunt(huntId: string) {
 
     revalidatePath("/dashboard/hunts");
     revalidatePath("/outfitter/dashboard");
-    revalidatePath("/"); // NEW: Also refresh homepage when a hunt is deleted!
+    revalidatePath("/"); // Also refresh homepage when a hunt is deleted!
     
     return { success: true };
   } catch (error: any) {

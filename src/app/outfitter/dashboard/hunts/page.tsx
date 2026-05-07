@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { auth, db } from "@/lib/firebase/client";
-import { collection, query, where, getDocs, doc, deleteDoc } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, deleteDoc, getDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, Plus, PackageOpen, Clock, CheckCircle, MapPin, DollarSign, Image as ImageIcon, Edit, Trash2 } from "lucide-react";
+import { Loader2, Plus, PackageOpen, Clock, CheckCircle, MapPin, DollarSign, Image as ImageIcon, Edit, Trash2, Lock, ArrowRight } from "lucide-react";
 
 interface Hunt {
   id: string;
@@ -15,8 +15,10 @@ interface Hunt {
   basePrice?: number;
   location: string;
   duration: number;
-  status: string; // PENDING, APPROVED, REJECTED
+  status: string; 
   coverImage?: string;
+  createdAt?: any;
+  isSoftLocked?: boolean; // Appended locally for UI display
 }
 
 export default function OutfitterHuntsPage() {
@@ -24,13 +26,27 @@ export default function OutfitterHuntsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  
+  // Track tier to display the warning banner
+  const [effectiveTier, setEffectiveTier] = useState("STANDARD");
+  const [hasSoftLockedHunts, setHasSoftLockedHunts] = useState(false);
 
   useEffect(() => {
     const fetchHunts = async () => {
       if (!auth.currentUser) return;
       
       try {
-        // SECURITY: Only fetch hunts where the outfitterId matches the logged-in user
+        // 1. Fetch Outfitter Tier
+        const outfitterDoc = await getDoc(doc(db, "outfitters", auth.currentUser.uid));
+        let tier = "STANDARD";
+        if (outfitterDoc.exists()) {
+          const profile = outfitterDoc.data();
+          const isPromoActive = profile.promoExpiresAt && new Date(profile.promoExpiresAt) > new Date();
+          tier = (isPromoActive || profile.tier === "PRO" || profile.tier === "pro") ? "PRO" : "STANDARD";
+        }
+        setEffectiveTier(tier);
+
+        // 2. Fetch Hunts
         const huntsRef = collection(db, "hunts");
         const q = query(huntsRef, where("outfitterId", "==", auth.currentUser.uid));
         const querySnapshot = await getDocs(q);
@@ -40,14 +56,31 @@ export default function OutfitterHuntsPage() {
           ...doc.data()
         })) as Hunt[];
         
-        // Sort manually by creation date (newest first)
+        // Sort newest first
         fetchedHunts.sort((a: any, b: any) => {
           const dateA = new Date(a.createdAt || 0).getTime();
           const dateB = new Date(b.createdAt || 0).getTime();
           return dateB - dateA;
         });
 
-        setHunts(fetchedHunts);
+        // 3. Apply Soft Lock logic for UI
+        let activeCount = 0;
+        let foundLocked = false;
+        
+        const processedHunts = fetchedHunts.map(hunt => {
+          if (tier === "STANDARD" && hunt.status === "APPROVED") {
+            if (activeCount >= 5) {
+              foundLocked = true;
+              return { ...hunt, isSoftLocked: true };
+            }
+            activeCount++;
+          }
+          return { ...hunt, isSoftLocked: false };
+        });
+
+        setHasSoftLockedHunts(foundLocked);
+        setHunts(processedHunts);
+
       } catch (err) {
         console.error("Error fetching hunts:", err);
         setError("Failed to load your packages.");
@@ -59,7 +92,6 @@ export default function OutfitterHuntsPage() {
     fetchHunts();
   }, []);
 
-  // --- NEW DELETE LOGIC ---
   const handleDelete = async (id: string, title: string) => {
     const confirmDelete = window.confirm(`Are you sure you want to permanently delete "${title}"? This action cannot be undone.`);
     
@@ -69,10 +101,12 @@ export default function OutfitterHuntsPage() {
     try {
       await deleteDoc(doc(db, "hunts", id));
       setHunts(prev => prev.filter(hunt => hunt.id !== id));
+      // In a robust app, we'd trigger a re-evaluation of the soft lock here, 
+      // but reloading the page or forcing a re-fetch handles it cleanly.
+      window.location.reload(); 
     } catch (err) {
       console.error("Error deleting hunt:", err);
       alert("Failed to delete package. Please try again.");
-    } finally {
       setIsDeleting(null);
     }
   };
@@ -96,16 +130,46 @@ export default function OutfitterHuntsPage() {
             Manage your hunt listings and pricing.
           </p>
         </div>
-        <Link href="/outfitter/dashboard/hunts/new">
-          <Button className="h-12 px-6 bg-kalahari hover:bg-kalahari/90 text-white font-black shadow-md flex items-center gap-2">
-            <Plus className="h-5 w-5" /> Create New Package
-          </Button>
-        </Link>
+        
+        {/* Disable creation if they are STANDARD and at the limit */}
+        {effectiveTier === "STANDARD" && hunts.filter(h => h.status !== "REJECTED").length >= 5 ? (
+          <Link href="/outfitter/tiers">
+            <Button className="h-12 px-6 bg-orange-600 hover:bg-orange-700 text-white font-black shadow-md flex items-center gap-2">
+              <Lock className="h-5 w-5" /> Upgrade to Create More
+            </Button>
+          </Link>
+        ) : (
+          <Link href="/outfitter/dashboard/hunts/new">
+            <Button className="h-12 px-6 bg-kalahari hover:bg-kalahari/90 text-white font-black shadow-md flex items-center gap-2">
+              <Plus className="h-5 w-5" /> Create New Package
+            </Button>
+          </Link>
+        )}
       </div>
 
       {error && (
         <div className="bg-red-50 text-red-800 p-4 rounded-lg border border-red-200 font-bold">
           {error}
+        </div>
+      )}
+
+      {/* --- SOFT LOCK WARNING BANNER --- */}
+      {hasSoftLockedHunts && (
+        <div className="bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-500/40 p-6 rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-5 shadow-md">
+          <div className="flex items-start gap-4">
+            <Lock className="h-8 w-8 text-orange-500 shrink-0 mt-1" />
+            <div>
+              <h3 className="text-lg font-black text-orange-800 dark:text-orange-400">Inventory Limit Reached</h3>
+              <p className="text-orange-700 dark:text-orange-300 mt-1 font-medium text-sm">
+                Your standard account is limited to 5 active packages. Any older packages have been paused and hidden from hunters. Upgrade to PRO to reactivate your entire catalog.
+              </p>
+            </div>
+          </div>
+          <Link href="/outfitter/tiers" className="shrink-0 w-full md:w-auto mt-4 md:mt-0">
+            <Button className="w-full bg-orange-600 hover:bg-orange-700 text-white font-black">
+              Upgrade Now <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </Link>
         </div>
       )}
 
@@ -131,7 +195,7 @@ export default function OutfitterHuntsPage() {
       {!loading && hunts.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {hunts.map((hunt) => (
-            <Card key={hunt.id} className="overflow-hidden border-2 border-kalahari/20 shadow-sm hover:shadow-md transition-all group flex flex-col">
+            <Card key={hunt.id} className={`overflow-hidden border-2 shadow-sm transition-all group flex flex-col ${hunt.isSoftLocked ? 'border-orange-500/50 opacity-75' : 'border-kalahari/20 hover:shadow-md'}`}>
               
               {/* Image Thumbnail */}
               <div className="h-48 bg-kalahari/10 relative border-b-2 border-kalahari/20 overflow-hidden">
@@ -143,21 +207,27 @@ export default function OutfitterHuntsPage() {
                   </div>
                 )}
                 
-                {/* Status Badge */}
-                <div className="absolute top-3 right-3">
-                  {hunt.status === "APPROVED" ? (
-                    <span className="bg-green-100 text-green-800 border border-green-200 text-xs font-black px-3 py-1 rounded shadow-sm flex items-center gap-1.5 uppercase tracking-wide">
-                      <CheckCircle className="h-3.5 w-3.5" /> Live
-                    </span>
-                  ) : hunt.status === "REJECTED" ? (
-                    <span className="bg-red-100 text-red-800 border border-red-200 text-xs font-black px-3 py-1 rounded shadow-sm uppercase tracking-wide">
-                      Rejected
-                    </span>
-                  ) : (
-                    <span className="bg-amber-100 text-amber-800 border border-amber-200 text-xs font-black px-3 py-1 rounded shadow-sm flex items-center gap-1.5 uppercase tracking-wide">
-                      <Clock className="h-3.5 w-3.5" /> Pending Review
-                    </span>
-                  )}
+                {/* Status Badge Overlay */}
+                <div className="absolute inset-0 flex flex-col justify-between p-3 pointer-events-none">
+                  <div className="flex justify-end">
+                    {hunt.isSoftLocked ? (
+                      <span className="bg-orange-100 text-orange-800 border border-orange-300 text-xs font-black px-3 py-1 rounded shadow-md flex items-center gap-1.5 uppercase tracking-wide backdrop-blur-md">
+                        <Lock className="h-3.5 w-3.5" /> Paused (Limit)
+                      </span>
+                    ) : hunt.status === "APPROVED" ? (
+                      <span className="bg-green-100 text-green-800 border border-green-200 text-xs font-black px-3 py-1 rounded shadow-sm flex items-center gap-1.5 uppercase tracking-wide">
+                        <CheckCircle className="h-3.5 w-3.5" /> Live
+                      </span>
+                    ) : hunt.status === "REJECTED" ? (
+                      <span className="bg-red-100 text-red-800 border border-red-200 text-xs font-black px-3 py-1 rounded shadow-sm uppercase tracking-wide">
+                        Rejected
+                      </span>
+                    ) : (
+                      <span className="bg-amber-100 text-amber-800 border border-amber-200 text-xs font-black px-3 py-1 rounded shadow-sm flex items-center gap-1.5 uppercase tracking-wide">
+                        <Clock className="h-3.5 w-3.5" /> Pending Review
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -182,7 +252,6 @@ export default function OutfitterHuntsPage() {
                   </div>
                 </div>
 
-                {/* --- NEW ACTION BUTTONS --- */}
                 <div className="mt-5 grid grid-cols-2 gap-3 border-t border-kalahari/10 pt-4">
                   <Link 
                     href={`/outfitter/dashboard/hunts/${hunt.id}/edit`}

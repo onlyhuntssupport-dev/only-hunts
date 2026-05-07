@@ -8,9 +8,9 @@ import { ShieldCheck, MapPin, Target, Compass, ArrowLeft, User, Calendar, Dollar
 // Custom Components
 import ClientWishlistLoader from '@/components/marketplace/ClientWishlistLoader';
 import AnalyticsTracker from '@/components/marketplace/AnalyticsTracker';
-import LeadForm from '@/components/marketplace/LeadForm';
 import OfferRedemptionBanner from '@/components/marketplace/OfferRedemptionBanner';
 import MessageOutfitterButton from '@/components/marketplace/MessageOutfitterButton';
+import HunterCheckoutWidget from '@/components/marketplace/HunterCheckoutWidget'; // NEW IMPORT
 import { getHuntById } from '@/app/actions/hunts';
 
 interface Props {
@@ -25,14 +25,12 @@ export async function generateMetadata(
   const { id } = resolvedParams;
   
   const rawResponse = await getHuntById(id);
-  // OVERRIDE: Tell TypeScript to trust our data structure
   const hunt = rawResponse.data as any; 
   
   if (!hunt) {
     return { title: 'Hunt Not Found | Only-Hunts' };
   }
   
-  // Safely inherit previous images for fallbacks
   const previousImages = (await parent).openGraph?.images || [];
   const coverImg = hunt.coverImage || hunt.imageUrl;
   
@@ -79,7 +77,6 @@ export default async function HuntDetailPage({ params }: Props) {
   const { id } = resolvedParams;
   
   const response = await getHuntById(id);
-  // OVERRIDE: Bypass the strict Type inference for the Firebase fetch
   const success = response.success;
   const huntData = response.data as any; 
   
@@ -87,7 +84,6 @@ export default async function HuntDetailPage({ params }: Props) {
     notFound();
   }
   
-  // 1. Fetch Outfitter Profile Image
   let outfitterImage = null;
   if (huntData.outfitterId) {
     try {
@@ -100,27 +96,24 @@ export default async function HuntDetailPage({ params }: Props) {
     }
   }
 
-  // 2. Fetch More Packages from this Outfitter
   let otherPackages: any[] = [];
   if (huntData.outfitterId) {
     try {
       const otherHuntsSnapshot = await adminDb.collection('hunts')
         .where('outfitterId', '==', huntData.outfitterId)
         .where('status', '==', 'APPROVED')
-        .limit(4) // Fetch 4 in case one is the current package
+        .limit(4) 
         .get();
         
       otherPackages = otherHuntsSnapshot.docs
-        // OVERRIDE: Cast the related packages as well
         .map(doc => ({ id: doc.id, ...doc.data() } as any))
-        .filter((h: any) => h.id !== huntData.id) // Exclude current package
-        .slice(0, 3); // Keep only up to 3
+        .filter((h: any) => h.id !== huntData.id) 
+        .slice(0, 3); 
     } catch (error) {
       console.error("Error fetching other packages:", error);
     }
   }
 
-  // Aggregate all possible images for the gallery
   const allImages: string[] = [];
   if (huntData.coverImage) allImages.push(huntData.coverImage);
   if (huntData.imageUrl && huntData.imageUrl !== huntData.coverImage) allImages.push(huntData.imageUrl);
@@ -136,7 +129,6 @@ export default async function HuntDetailPage({ params }: Props) {
     <div className="relative min-h-screen bg-olive">
       <AnalyticsTracker huntId={huntData.id} />
       
-      {/* --- FIXED FULLSCREEN BACKGROUND --- */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         <div 
           className="absolute inset-0 z-0 bg-cover bg-[position:center_top] bg-no-repeat opacity-40"
@@ -145,11 +137,9 @@ export default async function HuntDetailPage({ params }: Props) {
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-olive/80 to-olive"></div>
       </div>
 
-      {/* --- MAIN SCROLLING CONTENT --- */}
       <div className="relative z-10 pb-24 text-off-white font-body pt-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
-          {/* Top Bar: Back Button & Title */}
           <div className="mb-6 flex justify-between items-start">
             <div>
               <Link href="/marketplace" className="inline-flex items-center text-sm font-bold text-kalahari hover:text-white transition-colors mb-4 bg-black/20 backdrop-blur-sm px-3 py-1.5 rounded-full border border-kalahari/20">
@@ -170,22 +160,17 @@ export default async function HuntDetailPage({ params }: Props) {
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12">
             
-            {/* LEFT COLUMN MAIN WRAPPER (Spans 2 cols) */}
             <div className="lg:col-span-2 space-y-8">
               
-              {/* --- VERTICAL STACK FIX --- */}
               <div className="flex flex-col gap-8">
                 
-                {/* 1. FULL WIDTH IMAGE GALLERY */}
                 <div className="w-full">
                   {allImages.length > 0 ? (
                     <div className="relative w-full h-[500px] sm:h-[600px] rounded-3xl overflow-hidden flex flex-col gap-2 border-2 border-kalahari/20 shadow-xl bg-black">
-                      {/* Main Feature Image (Top) */}
                       <div className={`relative w-full ${allImages.length > 1 ? 'h-2/3' : 'h-full'}`}>
                         <Image src={allImages[0]} alt="Featured Safari Image" fill className="object-cover" priority />
                       </div>
                       
-                      {/* Secondary Grid (Bottom Split) */}
                       {allImages.length > 1 && (
                         <div className="flex gap-2 w-full h-1/3">
                           <div className="relative h-full w-1/2">
@@ -215,10 +200,8 @@ export default async function HuntDetailPage({ params }: Props) {
                   )}
                 </div>
 
-                {/* 2. FULL WIDTH PACKAGE DETAILS */}
                 <div className="bg-black/20 backdrop-blur-md rounded-3xl border border-kalahari/20 p-6 shadow-lg w-full">
                   
-                  {/* Quick Specs */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pb-6 border-b border-kalahari/20 mb-6">
                     {huntData.duration && (
                       <div className="flex flex-col">
@@ -238,7 +221,6 @@ export default async function HuntDetailPage({ params }: Props) {
                     </div>
                   </div>
 
-                  {/* The Description */}
                   {huntData.description && (
                     <div className="mb-8">
                       <h2 className="text-xl font-black font-headline text-white mb-3">The Experience</h2>
@@ -248,7 +230,6 @@ export default async function HuntDetailPage({ params }: Props) {
                     </div>
                   )}
 
-                  {/* What's Included / Excluded (Side by Side on Desktop) */}
                   {(huntData.includedItems || huntData.excludedItems) && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {huntData.includedItems && (
@@ -274,7 +255,6 @@ export default async function HuntDetailPage({ params }: Props) {
                     </div>
                   )}
 
-                  {/* Additional Species */}
                   {huntData.additionalSpecies && (
                     <div className="mt-6 pt-6 border-t border-kalahari/20">
                       <h3 className="text-xs font-black text-white uppercase tracking-widest mb-2 flex items-center gap-2">
@@ -287,9 +267,8 @@ export default async function HuntDetailPage({ params }: Props) {
                   )}
                 </div>
 
-              </div> {/* END VERTICAL STACK FIX */}
+              </div>
 
-              {/* FULL WIDTH CARD 2: Meet The Outfitter */}
               <div className="bg-gradient-to-br from-black/60 to-black/30 backdrop-blur-md border-2 border-kalahari/30 rounded-3xl p-8 flex flex-col md:flex-row items-center md:items-start justify-between gap-6 shadow-xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
                   <ShieldCheck className="w-40 h-40 text-kalahari" />
@@ -322,7 +301,6 @@ export default async function HuntDetailPage({ params }: Props) {
                 </div>
               </div>
 
-              {/* FULL WIDTH CARD 3: More From This Outfitter */}
               {otherPackages.length > 0 && (
                 <div className="pt-6">
                   <h3 className="text-xl font-black font-headline text-white mb-6 flex items-center">
@@ -355,11 +333,9 @@ export default async function HuntDetailPage({ params }: Props) {
 
             </div>
 
-            {/* RIGHT COLUMN: Standard Checkout Card (Spans 1 col) */}
             <div className="lg:col-span-1">
               <div className="space-y-6">
                 
-                {/* Main Pricing & Booking Card */}
                 <div className="bg-black/60 border-2 border-kalahari/40 rounded-3xl p-6 md:p-8 shadow-2xl relative overflow-hidden backdrop-blur-xl">
                   
                   <div className="relative z-10">
@@ -386,11 +362,20 @@ export default async function HuntDetailPage({ params }: Props) {
                     </div>
 
                     <div className="space-y-4">
-                       <LeadForm
-                        huntId={huntData.id}
-                        outfitterId={huntData.outfitterId}
-                        huntTitle={huntData.title || "Untitled Package"}
-                      />
+                       {/* INJECTED NEW CHECKOUT WIDGET */}
+                       {displayPrice ? (
+                         <HunterCheckoutWidget 
+                           huntId={huntData.id}
+                           outfitterId={huntData.outfitterId}
+                           huntTitle={huntData.title || "Untitled Package"}
+                           priceUSD={displayPrice}
+                           depositPercentage={huntData.depositPercentage}
+                         />
+                       ) : (
+                         <div className="bg-kalahari/10 border border-kalahari/30 text-off-white p-4 rounded-xl text-center text-sm font-medium">
+                           Pricing unavailable. Please message the outfitter.
+                         </div>
+                       )}
                       
                       <div className="pt-2">
                         <MessageOutfitterButton 
@@ -404,11 +389,10 @@ export default async function HuntDetailPage({ params }: Props) {
                   </div>
                 </div>
 
-                {/* Trust Guarantees */}
                 <div className="bg-black/40 border border-kalahari/20 rounded-2xl p-6 text-center backdrop-blur-sm">
                   <ShieldCheck className="w-10 h-10 text-kalahari mx-auto mb-3 opacity-80 drop-shadow-sm" />
                   <p className="text-sm font-black text-white uppercase tracking-widest mb-2">Only-Hunts Guarantee</p>
-                  <p className="text-xs text-off-white/70 font-medium leading-relaxed">Your inquiry is sent directly to the verified outfitter. Secure, transparent booking with zero hidden platform fees.</p>
+                  <p className="text-xs text-off-white/70 font-medium leading-relaxed">Your deposit secures your dates directly with the verified outfitter. Secure, transparent booking with zero hidden platform fees.</p>
                 </div>
 
               </div>

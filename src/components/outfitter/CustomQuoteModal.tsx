@@ -3,14 +3,14 @@
 import { useState, useEffect } from "react";
 import { X, Calendar, Users, Target, Send, CheckCircle, MapPin, AlertTriangle } from "lucide-react";
 import { db, auth } from "@/lib/firebase/client";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+// Added doc and getDoc to retrieve the outfitter's email
+import { collection, addDoc, serverTimestamp, doc, getDoc } from "firebase/firestore";
 
 interface CustomQuoteModalProps {
   isOpen: boolean;
   onClose: () => void;
   outfitterId: string;
   outfitterName: string;
-  // NEW: Accepted prop for checking date availability
   bookedDates?: {start: string, end: string}[];
 }
 
@@ -49,7 +49,6 @@ export default function CustomQuoteModal({ isOpen, onClose, outfitterId, outfitt
   const [error, setError] = useState("");
   const [dateConflict, setDateConflict] = useState(false);
 
-  // NEW: Check for overlapping bookings whenever dates change
   useEffect(() => {
     setDateConflict(false);
     setError("");
@@ -58,7 +57,6 @@ export default function CustomQuoteModal({ isOpen, onClose, outfitterId, outfitt
       const selectedStart = new Date(startDate);
       const selectedEnd = new Date(endDate);
 
-      // Normalize time to midnight for accurate day comparison
       selectedStart.setHours(0,0,0,0);
       selectedEnd.setHours(23,59,59,999);
 
@@ -69,7 +67,6 @@ export default function CustomQuoteModal({ isOpen, onClose, outfitterId, outfitt
         bStart.setHours(0,0,0,0);
         bEnd.setHours(23,59,59,999);
 
-        // Check if selected range overlaps with booking range
         return (selectedStart <= bEnd && selectedEnd >= bStart);
       });
 
@@ -78,7 +75,6 @@ export default function CustomQuoteModal({ isOpen, onClose, outfitterId, outfitt
         setError("The dates you selected overlap with an existing booking. Please select different dates.");
       }
 
-      // Calculate days difference
       const diffTime = selectedEnd.getTime() - selectedStart.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       
@@ -130,6 +126,7 @@ export default function CustomQuoteModal({ isOpen, onClose, outfitterId, outfitt
         throw new Error("Please log in or create a free Hunter account to request quotes.");
       }
 
+      // 1. Write to Firestore
       const requestsRef = collection(db, "quote_requests");
       await addDoc(requestsRef, {
         outfitterId,
@@ -150,6 +147,43 @@ export default function CustomQuoteModal({ isOpen, onClose, outfitterId, outfitt
         message,
         createdAt: serverTimestamp(),
       });
+
+      // --- 2. EMAIL ENGINE DISPATCH ---
+      try {
+        // Fetch the outfitter's email from the users collection
+        const outfitterDoc = await getDoc(doc(db, "users", outfitterId));
+        let outfitterEmail = null;
+        
+        if (outfitterDoc.exists()) {
+          outfitterEmail = outfitterDoc.data().email;
+        }
+
+        // Only fire if we found a valid email
+        if (outfitterEmail) {
+          const idToken = await currentUser.getIdToken(true);
+          
+          await fetch("/api/email", {
+            method: "POST",
+            headers: { 
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${idToken}`
+            },
+            body: JSON.stringify({
+              to: outfitterEmail,
+              subject: `New Safari Request: ${days} Days in ${province}`,
+              userName: outfitterName,
+              title: "New Quote Request",
+              message: `${currentUser.displayName || "A hunter"} has requested a custom safari quote. Target species include: ${targetSpecies.slice(0, 3).join(", ")}${targetSpecies.length > 3 ? ' and more' : ''}. Log in to build and send their proposal.`,
+              ctaText: "Review Request & Build Quote",
+              ctaLink: "https://www.only-hunts.com/outfitter/dashboard",
+            }),
+          });
+        }
+      } catch (emailErr) {
+        console.error("Silent failure: Email engine dropped the request notification", emailErr);
+        // We do not throw this error to the user. The database write already succeeded.
+      }
+      // --- END EMAIL ENGINE DISPATCH ---
 
       setIsSuccess(true);
       

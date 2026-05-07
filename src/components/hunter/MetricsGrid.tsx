@@ -78,7 +78,7 @@ export default function MetricsGrid({
           </Card>
         </Link>
         
-        <Link href="/hunter/wishlist" className="block outline-none focus-visible:ring-2 focus-visible:ring-kalahari rounded-2xl">
+        <Link href="/hunter/dashboard/wishlist" className="block outline-none focus-visible:ring-2 focus-visible:ring-kalahari rounded-2xl">
           <Card className="border-2 border-kalahari/20 dark:border-kalahari/40 shadow-lg rounded-2xl overflow-hidden hover:border-kalahari dark:hover:border-kalahari bg-white/90 dark:bg-black/50 backdrop-blur-md transition-all group cursor-pointer h-full">
             <div className="p-6 flex items-center justify-between h-full">
               <div>

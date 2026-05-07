@@ -2,7 +2,7 @@ import { onRequest } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import * as crypto from "crypto";
 
-// Ensure Admin SDK is initialized (usually done in your main index.ts)
+// Ensure Admin SDK is initialized
 if (!admin.apps.length) {
   admin.initializeApp();
 }
@@ -46,27 +46,29 @@ export const paystackWebhook = onRequest(
     res.status(200).send("Webhook Received");
 
     try {
+      const { data } = event;
+      const outfitterId = data?.metadata?.outfitterId;
+
+      // --- UPGRADE LOGIC ---
       if (event.event === "charge.success") {
-        const { reference, amount, metadata, customer, paid_at } = event.data;
+        const { reference, amount, customer, paid_at } = data;
         
         // Convert Paystack amount (in cents) to ZAR
         const grossAmountZAR = amount / 100;
         
         // Determine transaction type from metadata payload
-        const transactionType = metadata?.type || "unknown"; // 'subscription', 'commission', 'deposit'
-        const outfitterId = metadata?.outfitterId || "unassigned";
-
-        // Calculate 15% VAT for the R800 subscriptions (Platform as Principal)
+        const transactionType = data.metadata?.type || "subscription"; 
+        
+        // Calculate 15% VAT for the R800 subscriptions
         let vatAmount = 0;
         if (transactionType === "subscription") {
-          // VAT fraction: 15/115 to extract VAT from a VAT-inclusive amount
           vatAmount = Number(((grossAmountZAR * 15) / 115).toFixed(2));
         }
 
-        // 4. Write to the Immutable Ledger via Admin SDK
+        // Write to the Immutable Ledger
         await db.collection("transactions").doc(reference).set({
           transactionId: reference,
-          outfitterId: outfitterId,
+          outfitterId: outfitterId || "unassigned",
           customerEmail: customer?.email || "unknown",
           type: transactionType,
           grossAmountZAR: grossAmountZAR,
@@ -75,9 +77,30 @@ export const paystackWebhook = onRequest(
           timestamp: admin.firestore.Timestamp.fromDate(new Date(paid_at)),
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
-
+        
         console.log(`Successfully logged transaction: ${reference}`);
+
+        // Trigger the PRO Upgrade
+        if (outfitterId && transactionType === "subscription") {
+          await db.collection("outfitters").doc(outfitterId).update({
+            tier: "PRO",
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+          console.log(`Upgraded Outfitter ${outfitterId} to PRO Tier.`);
+        }
       }
+
+      // --- DOWNGRADE LOGIC (The Soft Lock Trigger) ---
+      if (event.event === "subscription.disable" || event.event === "charge.failed") {
+        if (outfitterId) {
+          await db.collection("outfitters").doc(outfitterId).update({
+            tier: "STANDARD",
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+          console.log(`Downgraded Outfitter ${outfitterId} to STANDARD Tier due to cancellation/failure.`);
+        }
+      }
+
     } catch (error) {
       console.error("Error processing webhook payload:", error);
       // We already returned 200 to Paystack, so we just log the internal failure

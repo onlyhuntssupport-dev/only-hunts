@@ -2,22 +2,36 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { auth } from "@/lib/firebase/client"; 
-import { initializeSubscription } from "@/app/actions/paystack";
-import { ArrowLeft, CheckCircle2, ShieldCheck, Crosshair, XCircle, Info, Calculator, Search, BadgeCheck, X, Loader2 } from "lucide-react";
+import { auth, db } from "@/lib/firebase/client"; 
+import { doc, getDoc } from "firebase/firestore";
+import { initializeSubscription, cancelSubscription } from "@/app/actions/paystack";
+import { ArrowLeft, CheckCircle2, ShieldCheck, Crosshair, XCircle, Info, Calculator, Search, BadgeCheck, X, Loader2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function OutfitterTiersPage() {
   const router = useRouter();
-  const [loadingTier, setLoadingTier] = useState<"standard" | "pro" | null>(null);
+  const [loadingAction, setLoadingAction] = useState<"upgrade" | "cancel" | null>(null);
   const [error, setError] = useState("");
   const [user, setUser] = useState<{ uid: string; email: string } | null>(null);
+  const [currentTier, setCurrentTier] = useState<string>("standard");
+  const [isFetchingTier, setIsFetchingTier] = useState(true);
 
-  // Auth Bouncer
+  // Auth Bouncer & Tier Check
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
+    const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
       if (currentUser && currentUser.email) {
         setUser({ uid: currentUser.uid, email: currentUser.email });
+        
+        try {
+          const outfitterDoc = await getDoc(doc(db, "outfitters", currentUser.uid));
+          if (outfitterDoc.exists()) {
+            setCurrentTier(outfitterDoc.data().tier || "standard");
+          }
+        } catch (err) {
+          console.error("Failed to fetch tier status", err);
+        } finally {
+          setIsFetchingTier(false);
+        }
       } else {
         router.push("/login");
       }
@@ -25,22 +39,52 @@ export default function OutfitterTiersPage() {
     return () => unsubscribe();
   }, [router]);
 
-  // Only handling the PRO upgrade since Standard is the R0 default
   const handleUpgrade = async () => {
     if (!user) return;
-    setLoadingTier("pro");
+    setLoadingAction("upgrade");
     setError("");
 
     try {
-      // NOTE: Ensure your backend action charges R800 ZAR
       const { authorizationUrl } = await initializeSubscription(user.email, user.uid);
       window.location.href = authorizationUrl;
     } catch (err) {
       console.error("Upgrade failed:", err);
       setError("Failed to initialize payment. Please try again.");
-      setLoadingTier(null);
+      setLoadingAction(null);
     }
   };
+
+  const handleCancel = async () => {
+    if (!user) return;
+    
+    if (!window.confirm("Are you sure you want to cancel? You will immediately lose priority search placement and access to the auto-quote engine.")) {
+      return;
+    }
+
+    setLoadingAction("cancel");
+    setError("");
+
+    try {
+      const res = await cancelSubscription(user.email, user.uid);
+      if (res.success) {
+        alert("Subscription cancelled successfully. You are now on the Standard plan.");
+        setCurrentTier("standard");
+      } else {
+        throw new Error(res.error || "Failed to cancel.");
+      }
+    } catch (err: any) {
+      console.error("Cancellation failed:", err);
+      setError(err.message || "Failed to cancel subscription. Please contact support.");
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  if (isFetchingTier) {
+    return <div className="min-h-screen flex items-center justify-center bg-stone-950"><Loader2 className="h-10 w-10 text-kalahari animate-spin" /></div>;
+  }
+
+  const isPro = currentTier === "pro_tier" || currentTier === "PRO" || currentTier === "pro";
 
   return (
     <div className="min-h-screen bg-stone-50 dark:bg-stone-950 transition-colors duration-300 pb-24">
@@ -76,7 +120,12 @@ export default function OutfitterTiersPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto items-stretch">
           
           {/* TIER 1: STANDARD (FREE) */}
-          <div className="bg-white dark:bg-stone-900 border-2 border-stone-200 dark:border-stone-800 rounded-3xl p-8 shadow-lg flex flex-col relative h-full">
+          <div className={`bg-white dark:bg-stone-900 border-2 rounded-3xl p-8 shadow-lg flex flex-col relative h-full transition-all ${!isPro ? 'border-kalahari ring-4 ring-kalahari/10' : 'border-stone-200 dark:border-stone-800 opacity-80'}`}>
+            {!isPro && (
+              <div className="absolute top-0 right-0 bg-kalahari text-white text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-bl-xl">
+                Current Plan
+              </div>
+            )}
             <div className="mb-6">
               <div className="flex items-center gap-3 mb-2">
                 <ShieldCheck className="h-8 w-8 text-green-600 dark:text-green-500" />
@@ -115,15 +164,23 @@ export default function OutfitterTiersPage() {
               </div>
             </div>
 
-            <Button variant="outline" className="w-full h-14 text-lg font-black border-2 border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300 mt-auto" disabled>
-              Current Default Plan
-            </Button>
+            <div className="mt-auto relative z-10">
+              {!isPro ? (
+                <div className="w-full h-14 flex items-center justify-center rounded-xl text-lg font-black bg-kalahari/10 border-2 border-kalahari text-kalahari">
+                  <CheckCircle2 className="h-5 w-5 mr-2" /> Active Plan
+                </div>
+              ) : (
+                <div className="w-full h-14 flex items-center justify-center rounded-xl text-lg font-black border-2 border-stone-200 dark:border-stone-800 text-stone-400 dark:text-stone-500">
+                  Included
+                </div>
+              )}
+            </div>
           </div>
 
           {/* TIER 2: ONLY-HUNTS PRO (PAID) */}
-          <div className="bg-stone-950 border-2 border-zinc-800 rounded-3xl p-8 shadow-2xl flex flex-col relative overflow-hidden ring-4 ring-kalahari/20 h-full">
-            <div className="absolute top-0 right-0 bg-kalahari text-white text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-bl-xl">
-              Recommended
+          <div className={`bg-stone-950 border-2 rounded-3xl p-8 shadow-2xl flex flex-col relative overflow-hidden h-full transition-all ${isPro ? 'border-kalahari ring-4 ring-kalahari/20' : 'border-zinc-800'}`}>
+            <div className="absolute top-0 right-0 bg-zinc-800 text-zinc-300 text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-bl-xl">
+              {isPro ? 'Active Plan' : 'Recommended'}
             </div>
             
             <div className="mb-6 relative z-10">
@@ -172,26 +229,48 @@ export default function OutfitterTiersPage() {
             </div>
 
             <div className="mt-auto relative z-10">
-              <Button 
-                onClick={handleUpgrade}
-                disabled={loadingTier !== null || !user}
-                className="w-full h-14 text-lg font-black bg-kalahari hover:bg-kalahari/90 text-white shadow-[0_0_20px_rgba(209,164,123,0.3)] transition-all"
-              >
-                {loadingTier === "pro" ? (
-                  <><Loader2 className="h-6 w-6 animate-spin mr-2" /> Initializing Checkout...</>
-                ) : (
-                  "Upgrade to PRO"
-                )}
-              </Button>
-              <p className="text-center text-[10px] font-bold text-zinc-600 mt-3 uppercase tracking-widest">
-                Secured locally by Paystack
-              </p>
+              {!isPro ? (
+                <>
+                  <Button 
+                    onClick={handleUpgrade}
+                    disabled={loadingAction !== null || !user}
+                    className="w-full h-14 text-lg font-black bg-kalahari hover:bg-kalahari/90 text-white shadow-[0_0_20px_rgba(209,164,123,0.3)] transition-all"
+                  >
+                    {loadingAction === "upgrade" ? (
+                      <><Loader2 className="h-6 w-6 animate-spin mr-2" /> Initializing Checkout...</>
+                    ) : (
+                      "Upgrade to PRO"
+                    )}
+                  </Button>
+                  <p className="text-center text-[10px] font-bold text-zinc-600 mt-3 uppercase tracking-widest">
+                    Secured locally by Paystack
+                  </p>
+                </>
+              ) : (
+                <div className="space-y-3">
+                  <div className="bg-green-500/10 border border-green-500/30 text-green-400 p-3 rounded-xl flex items-center justify-center gap-2 font-bold text-sm">
+                    <CheckCircle2 className="h-5 w-5" /> Active Subscription
+                  </div>
+                  <Button 
+                    onClick={handleCancel}
+                    disabled={loadingAction !== null || !user}
+                    variant="outline"
+                    className="w-full h-12 text-sm font-black border-red-900/50 text-red-500 hover:bg-red-950/30 hover:text-red-400 transition-all flex items-center justify-center gap-2"
+                  >
+                    {loadingAction === "cancel" ? (
+                      <><Loader2 className="h-4 w-4 animate-spin" /> Processing...</>
+                    ) : (
+                      <><AlertTriangle className="h-4 w-4" /> Cancel PRO Plan</>
+                    )}
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
 
         </div>
 
-        {/* Feature & Terms Clarity (The "No Legal BS" Section) */}
+        {/* Feature & Terms Clarity */}
         <div className="max-w-4xl mx-auto mt-16 bg-white dark:bg-stone-900 border-2 border-stone-200 dark:border-stone-800 rounded-3xl p-8 shadow-sm">
           <div className="flex items-center gap-3 mb-6 border-b border-stone-200 dark:border-stone-800 pb-4">
             <Info className="h-6 w-6 text-kalahari" />
@@ -220,7 +299,7 @@ export default function OutfitterTiersPage() {
             <div>
               <h4 className="font-black text-stone-900 dark:text-white mb-2 text-sm uppercase tracking-wider">4. Subscription Cancellations</h4>
               <p className="text-sm text-stone-600 dark:text-stone-400 font-medium leading-relaxed">
-                You may cancel your R800/month PRO subscription at any time. Upon cancellation, you will retain PRO benefits until the end of your current billing cycle. Afterward, your account will automatically downgrade to the Standard (Free) tier, your commission rate will revert to 12%, and the Auto-Quote Engine will be disabled.
+                You may cancel your R800/month PRO subscription at any time. Upon cancellation, your account will instantly downgrade to the Standard (Free) tier, your commission rate will revert to 12%, and the Auto-Quote Engine will be disabled.
               </p>
             </div>
           </div>

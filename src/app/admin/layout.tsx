@@ -5,7 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { auth, db } from '@/lib/firebase/client';
 import { doc, getDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
-import { Shield, Store, Users, Activity, Wallet, Inbox, Loader2, BarChart, Award, Megaphone, Menu, X, Landmark, ClipboardList } from 'lucide-react';
+import { Shield, Store, Users, Activity, Wallet, Inbox, Loader2, BarChart, Award, Megaphone, Menu, X, Landmark, ClipboardList, Mail } from 'lucide-react';
 
 const navLinks = [
   { href: '/admin', label: 'Staff / Team', icon: Shield },
@@ -13,13 +13,15 @@ const navLinks = [
   { href: '/admin/hunters', label: 'Hunters', icon: Users },
   { href: '/admin/pipeline', label: 'Quote Flow', icon: Activity },
   { href: '/admin/accounting', label: 'Accounting', icon: Wallet },
-  // NEW: Protected SARS Accounting Route
+  // Protected SARS Accounting Route
   { href: '/admin/sars-accounting', label: 'SARS Ledger', icon: Landmark, requireSuperAdmin: true }, 
-  // NEW: Protected Audit Log Route
+  // Protected Audit Log Route
   { href: '/admin/audit-logs', label: 'Audit Logs', icon: ClipboardList, requireSuperAdmin: true }, 
   { href: '/admin/endorsements', label: 'Endorsements', icon: Award },
   { href: '/admin/ads', label: 'Sponsored Ads', icon: Megaphone },
   { href: '/admin/support', label: 'Support Inbox', icon: Inbox, isSupport: true }, 
+  // NEW: Email Tester Route
+  { href: '/admin/email-test', label: 'Email Tester', icon: Mail }, 
   { href: '/admin/traffic', label: 'Traffic Analytics', icon: BarChart }, 
 ];
 
@@ -27,7 +29,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
   const pathname = usePathname(); 
   const [isAuthorized, setIsAuthorized] = useState(false);
-  const [userRole, setUserRole] = useState<string | null>(null); // NEW: Track exact role for UI rendering
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [openTicketsCount, setOpenTicketsCount] = useState(0);
@@ -47,7 +49,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           const role = userDoc.data().role?.toUpperCase();
           if (role === 'ADMIN' || role === 'SUPER_ADMIN' || role === 'SUPERADMIN') {
             setIsAuthorized(true);
-            setUserRole(role); // Save role to state
+            setUserRole(role);
           } else {
             router.replace('/');
           }
@@ -98,7 +100,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (!isAuthorized) return null;
 
   return (
-    <div className="flex h-screen bg-off-white dark:bg-stone-950 overflow-hidden transition-colors">
+    // FIXED: Changed h-screen to min-h-screen to allow natural scrolling
+    <div className="flex min-h-screen bg-off-white dark:bg-stone-950 transition-colors">
       
       {/* Mobile Overlay */}
       {isMobileMenuOpen && (
@@ -108,10 +111,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         />
       )}
 
-      {/* Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 z-40 w-64 md:w-20 lg:w-64 border-r-2 border-kalahari/20 bg-white dark:bg-stone-900 flex flex-col transform transition-transform duration-300 md:relative md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      {/* Sidebar - Remains sticky/fixed on the side */}
+      <aside className={`fixed inset-y-0 left-0 z-40 w-64 md:w-20 lg:w-64 border-r-2 border-kalahari/20 bg-white dark:bg-stone-900 flex flex-col transform transition-transform duration-300 md:sticky md:top-0 md:h-screen md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         
-        <div className="p-6 border-b-2 border-kalahari/10 flex items-center justify-between gap-3">
+        <div className="p-6 border-b-2 border-kalahari/10 flex items-center justify-between gap-3 shrink-0">
           <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
             <div className="h-10 w-10 bg-kalahari rounded-xl flex items-center justify-center text-white font-black shrink-0">
               OH
@@ -128,9 +131,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </button>
         </div>
         
-        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto custom-scrollbar">
           {navLinks.map(link => {
-            // NEW: Hide Super Admin links from regular Admins
+            // Hide Super Admin links from regular Admins
             if (link.requireSuperAdmin && userRole !== 'SUPER_ADMIN' && userRole !== 'SUPERADMIN') {
               return null;
             }
@@ -152,7 +155,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   {link.isSupport && openTicketsCount > 0 && (
                     <span className="absolute -top-1 -right-1 flex h-3 w-3 md:hidden lg:hidden">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-red-50"></span>
                     </span>
                   )}
                 </div>
@@ -171,7 +174,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </nav>
       </aside>
 
-      <main className="flex-1 flex flex-col relative overflow-hidden">
+      {/* Main Content Area */}
+      <main className="flex-1 flex flex-col w-full min-w-0">
         
         {/* Mobile Header Bar */}
         <div className="md:hidden flex items-center justify-between p-4 border-b-2 border-kalahari/20 bg-white dark:bg-stone-900 sticky top-0 z-20">
@@ -191,8 +195,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </button>
         </div>
 
-        {/* Content Area */}
-        <div className="flex-1 overflow-y-auto">
+        {/* FIXED: Removed overflow-y-auto so the page flows naturally downwards */}
+        <div className="flex-1 w-full">
           {children}
         </div>
       </main>

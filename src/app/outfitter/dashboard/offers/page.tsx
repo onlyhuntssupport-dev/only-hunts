@@ -117,7 +117,7 @@ export default function OffersPage() {
       {/* HEADER */}
       <div className="border-b-2 border-kalahari/30 pb-6 flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="flex items-center gap-4">
-          <Link href="/outfitter/dashboard" className="p-2 bg-white border-2 border-kalahari/20 rounded-lg hover:border-kalahari transition-colors">
+          <Link href="/outfitter/dashboard" className="p-2 bg-white dark:bg-stone-900 border-2 border-kalahari/20 rounded-lg hover:border-kalahari transition-colors">
             <ArrowLeft className="h-6 w-6 text-olive dark:text-off-white" />
           </Link>
           <div>
@@ -137,7 +137,7 @@ export default function OffersPage() {
               placeholder="Search saved packages..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 rounded-xl border-2 border-kalahari/20 bg-white focus:border-kalahari focus:ring-kalahari text-olive dark:text-off-white font-medium outline-none transition-all"
+              className="w-full pl-10 pr-4 py-3 rounded-xl border-2 border-kalahari/20 bg-white dark:bg-stone-900 focus:border-kalahari focus:ring-kalahari text-olive dark:text-off-white font-medium outline-none transition-all"
             />
           </div>
         )}
@@ -145,8 +145,8 @@ export default function OffersPage() {
 
       {/* MAIN CONTENT AREA */}
       {savedHunts.length === 0 ? (
-        <div className="bg-white border-2 border-dashed border-kalahari/30 rounded-2xl p-12 text-center shadow-sm">
-          <div className="mx-auto h-20 w-20 bg-orange-50 rounded-full flex items-center justify-center mb-6">
+        <div className="bg-white dark:bg-stone-900 border-2 border-dashed border-kalahari/30 rounded-2xl p-12 text-center shadow-sm">
+          <div className="mx-auto h-20 w-20 bg-orange-50 dark:bg-orange-900/20 rounded-full flex items-center justify-center mb-6">
             <Flame className="h-10 w-10 text-orange-300" />
           </div>
           <h2 className="text-2xl font-black font-headline text-olive dark:text-off-white mb-3">No Wishlisted Packages Yet</h2>
@@ -157,7 +157,7 @@ export default function OffersPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredHunts.map(hunt => (
-            <div key={hunt.id} className="bg-white border-2 border-kalahari/20 rounded-2xl overflow-hidden shadow-sm hover:border-kalahari/60 hover:shadow-md transition-all flex flex-col">
+            <div key={hunt.id} className="bg-white dark:bg-stone-900 border-2 border-kalahari/20 rounded-2xl overflow-hidden shadow-sm hover:border-kalahari/60 hover:shadow-md transition-all flex flex-col">
               
               {/* Image Header */}
               <div className="h-48 relative bg-kalahari/10 border-b-2 border-kalahari/20">
@@ -199,9 +199,9 @@ export default function OffersPage() {
       {/* --- BLIND OFFER MODAL --- */}
       {offerModalOpen && selectedHunt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-kalahari/20">
+          <div className="bg-white dark:bg-stone-900 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-kalahari/20">
             
-            <div className="flex items-center justify-between p-6 border-b border-kalahari/10 bg-off-white">
+            <div className="flex items-center justify-between p-6 border-b border-kalahari/10 bg-off-white dark:bg-stone-950">
               <h3 className="text-xl font-black text-olive dark:text-off-white flex items-center gap-2">
                 <Flame className="h-5 w-5 text-orange-500" /> Send Blind Offer
               </h3>
@@ -216,8 +216,8 @@ export default function OffersPage() {
             <div className="p-6">
               {offerSuccessCount !== null ? (
                 <div className="text-center py-8">
-                  <div className="mx-auto h-16 w-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-                    <CheckCircle className="h-8 w-8 text-green-600" />
+                  <div className="mx-auto h-16 w-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mb-4">
+                    <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-500" />
                   </div>
                   <h3 className="text-2xl font-black text-olive dark:text-off-white mb-2">Offer Sent!</h3>
                   <p className="text-olive dark:text-off-white/70 font-medium">
@@ -226,8 +226,8 @@ export default function OffersPage() {
                 </div>
               ) : (
                 <>
-                  <div className="bg-orange-50 border border-orange-100 p-4 rounded-xl mb-6">
-                    <p className="text-sm text-orange-800 font-medium">
+                  <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-900/30 p-4 rounded-xl mb-6">
+                    <p className="text-sm text-orange-800 dark:text-orange-400 font-medium">
                       You are sending an exclusive offer to <strong>{selectedHunt.saveCount} hunters</strong> who saved <strong>"{selectedHunt.title}"</strong>.
                     </p>
                   </div>
@@ -240,7 +240,7 @@ export default function OffersPage() {
                       value={offerMessage}
                       onChange={(e) => setOfferMessage(e.target.value)}
                       placeholder="e.g. Hey! I have a cancellation next month. I can knock $500 off the total price if you book today."
-                      className="w-full h-32 p-4 bg-off-white border-2 border-kalahari/20 rounded-xl focus:border-kalahari focus:ring-kalahari text-olive dark:text-off-white resize-none"
+                      className="w-full h-32 p-4 bg-off-white dark:bg-stone-950 border-2 border-kalahari/20 rounded-xl focus:border-kalahari focus:ring-kalahari text-olive dark:text-off-white resize-none"
                     />
                   </div>
 

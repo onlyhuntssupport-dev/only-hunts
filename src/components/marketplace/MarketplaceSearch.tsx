@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search, MapPin, DollarSign, Target, X } from "lucide-react";
 
@@ -37,28 +37,15 @@ export default function MarketplaceSearch() {
     if (newLoc.trim()) params.set("loc", newLoc.trim());
     if (newPrice.trim()) params.set("price", newPrice.trim());
     
-    // UPDATED: Now routes to the dedicated marketplace page
-    router.push(`/marketplace?${params.toString()}`);
+    // UPDATED: Routes to the root page so the dynamic SearchResultsGrid takes over
+    router.push(`/?${params.toString()}`);
   }, [router]);
-
-  useEffect(() => {
-    const delayDebounceFn = setTimeout(() => {
-      if (
-        query !== (searchParams.get("q") || "") ||
-        location !== (searchParams.get("loc") || "") ||
-        maxPrice !== (searchParams.get("price") || "")
-      ) {
-        updateSearch(query, location, maxPrice);
-      }
-    }, 100); 
-    return () => clearTimeout(delayDebounceFn);
-  }, [query, location, maxPrice, updateSearch, searchParams]);
 
   const handleClear = () => {
     setQuery("");
     setLocation("");
     setMaxPrice("");
-    // UPDATED: Clears filters and resets the homepage
+    // UPDATED: Clears filters and resets the homepage view
     router.push(`/`);
   };
 
@@ -77,8 +64,9 @@ export default function MarketplaceSearch() {
           <select 
             value={query}
             onChange={(e) => {
-              setQuery(e.target.value);
-              updateSearch(e.target.value, location, maxPrice);
+              const val = e.target.value;
+              setQuery(val);
+              updateSearch(val, location, maxPrice);
             }}
             className="w-full h-20 pl-14 pr-8 pt-5 bg-transparent border-none focus:ring-0 outline-none font-bold text-olive dark:text-off-white text-lg appearance-none cursor-pointer [&>option]:bg-white [&>option]:dark:bg-olive"
           >
@@ -96,8 +84,9 @@ export default function MarketplaceSearch() {
           <select 
             value={location}
             onChange={(e) => {
-              setLocation(e.target.value);
-              updateSearch(query, e.target.value, maxPrice);
+              const val = e.target.value;
+              setLocation(val);
+              updateSearch(query, val, maxPrice);
             }}
             className="w-full h-20 pl-14 pr-8 pt-5 bg-transparent border-none focus:ring-0 outline-none font-bold text-olive dark:text-off-white text-lg appearance-none cursor-pointer [&>option]:bg-white [&>option]:dark:bg-olive"
           >
@@ -115,8 +104,9 @@ export default function MarketplaceSearch() {
           <select 
             value={maxPrice}
             onChange={(e) => {
-              setMaxPrice(e.target.value);
-              updateSearch(query, location, e.target.value);
+              const val = e.target.value;
+              setMaxPrice(val);
+              updateSearch(query, location, val);
             }}
             className="w-full h-20 pl-14 pr-8 pt-5 bg-transparent border-none focus:ring-0 outline-none font-bold text-olive dark:text-off-white text-lg appearance-none cursor-pointer [&>option]:bg-white [&>option]:dark:bg-olive"
           >

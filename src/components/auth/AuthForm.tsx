@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
@@ -9,7 +9,7 @@ import { syncUserProfile } from '@/app/actions/users';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Target, Compass, ShieldCheck, ArrowRight } from "lucide-react";
+import { Target, Compass, ShieldCheck, ArrowRight, Eye, EyeOff } from "lucide-react";
 import type { UserRole } from '@/types/auth';
 
 export default function AuthForm() {
@@ -20,6 +20,9 @@ export default function AuthForm() {
   const [isEmailLoading, setIsEmailLoading] = useState(false);
   const [error, setError] = useState('');
   
+  // SYNCHRONOUS GUARD: Blocks double-submissions before React state updates
+  const isSubmittingRef = useRef(false);
+  
   const router = useRouter();
   const { toast } = useToast();
 
@@ -27,14 +30,20 @@ export default function AuthForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Instantly kill duplicate events
+    if (isSubmittingRef.current) return;
+    
+    isSubmittingRef.current = true;
     setError('');
     setIsEmailLoading(true);
 
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
       const user = userCredential.user;
 
       const syncResult = await syncUserProfile({
@@ -80,12 +89,17 @@ export default function AuthForm() {
         setError(`Error: ${err.message || 'An unexpected error occurred.'}`); 
       }
     } finally {
+      isSubmittingRef.current = false;
       setIsEmailLoading(false);
     }
   };
 
   const handleEmailSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Instantly kill duplicate events
+    if (isSubmittingRef.current) return;
+    
     setError('');
 
     if (password !== confirmPassword) {
@@ -95,9 +109,11 @@ export default function AuthForm() {
       return setError("Password must be at least 6 characters long.");
     }
 
+    isSubmittingRef.current = true;
     setIsEmailLoading(true);
+    
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
       const user = userCredential.user;
 
       const syncResult = await syncUserProfile({
@@ -134,6 +150,7 @@ export default function AuthForm() {
         setError(err.message || 'An error occurred during sign up.');
       }
     } finally {
+      isSubmittingRef.current = false;
       setIsEmailLoading(false);
     }
   };
@@ -217,7 +234,7 @@ export default function AuthForm() {
           </Button>
         </div>
       ) : (
-        <form onSubmit={isLogin ? handleEmailLogin : handleEmailSignUp} className="space-y-4">
+        <form onSubmit={isLogin ? handleEmailLogin : handleEmailSignUp} className="space-y-4" suppressHydrationWarning>
           
           {!isLogin && (
             <div className="mb-6 bg-kalahari/5 dark:bg-black/40 p-4 rounded-xl border border-kalahari/20 dark:border-kalahari/30">
@@ -286,31 +303,53 @@ export default function AuthForm() {
                 </a>
               )}
             </div>
-            <Input 
-              type="password"
-              suppressHydrationWarning
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="h-12 border-kalahari/40 dark:border-kalahari/30 focus-visible:ring-olive dark:focus-visible:ring-kalahari font-medium bg-off-white dark:bg-black/50 dark:text-white transition-colors"
-              disabled={isEmailLoading || isSignUpDisabled}
-            />
+            <div className="relative">
+              <Input 
+                type={showPassword ? "text" : "password"}
+                suppressHydrationWarning
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="h-12 pr-10 border-kalahari/40 dark:border-kalahari/30 focus-visible:ring-olive dark:focus-visible:ring-kalahari font-medium bg-off-white dark:bg-black/50 dark:text-white transition-colors"
+                disabled={isEmailLoading || isSignUpDisabled}
+              />
+              <button
+                type="button"
+                suppressHydrationWarning
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 z-10 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 transition-colors"
+                disabled={isEmailLoading || isSignUpDisabled}
+              >
+                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              </button>
+            </div>
           </div>
 
           {!isLogin && (
             <div className="space-y-2">
               <label className="text-sm font-bold text-olive dark:text-off-white transition-colors">Confirm Password</label>
-              <Input 
-                type="password"
-                suppressHydrationWarning
-                placeholder="••••••••"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                className="h-12 border-kalahari/40 dark:border-kalahari/30 focus-visible:ring-olive dark:focus-visible:ring-kalahari font-medium bg-off-white dark:bg-black/50 dark:text-white transition-colors"
-                disabled={isEmailLoading || isSignUpDisabled}
-              />
+              <div className="relative">
+                <Input 
+                  type={showPassword ? "text" : "password"}
+                  suppressHydrationWarning
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  className="h-12 pr-10 border-kalahari/40 dark:border-kalahari/30 focus-visible:ring-olive dark:focus-visible:ring-kalahari font-medium bg-off-white dark:bg-black/50 dark:text-white transition-colors"
+                  disabled={isEmailLoading || isSignUpDisabled}
+                />
+                <button
+                  type="button"
+                  suppressHydrationWarning
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 z-10 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 transition-colors"
+                  disabled={isEmailLoading || isSignUpDisabled}
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
             </div>
           )}
 

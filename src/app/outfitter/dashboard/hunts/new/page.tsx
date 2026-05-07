@@ -4,12 +4,11 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase/client";
 import { collection, addDoc, doc, getDoc } from "firebase/firestore";
-// NEW IMPORT: Universal storage helper
 import { uploadWithCompression } from "@/lib/firebase/storageHelper";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Save, Image as ImageIcon, ArrowLeft, Target, MapPin, DollarSign, Calendar, CheckCircle2, XCircle, PlusCircle, Minus, Plus, X, Flame } from "lucide-react";
+import { Loader2, Save, Image as ImageIcon, ArrowLeft, Target, MapPin, DollarSign, Calendar, CheckCircle2, XCircle, PlusCircle, Minus, Plus, X, Flame, Calculator, Info } from "lucide-react";
 import Link from "next/link";
 
 // --- MASTER DATA LISTS ---
@@ -50,7 +49,12 @@ export default function CreateHuntPage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
-  // --- STRUCTURED FORM STATE ---
+  // --- FINANCIAL & FORM STATE ---
+  const [commissionRate, setCommissionRate] = useState(12); // Default to standard 12%
+  const [depositPercentage, setDepositPercentage] = useState(30); // Default to 30%
+  const [isProTier, setIsProTier] = useState(false);
+  const [hasPromoOverride, setHasPromoOverride] = useState(false);
+
   const [formData, setFormData] = useState({
     title: "",
     price: 3500,
@@ -71,12 +75,27 @@ export default function CreateHuntPage() {
     const fetchOutfitter = async () => {
       if (!auth.currentUser) return;
       try {
-        const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
-        if (userDoc.exists()) {
+        const outfitterDoc = await getDoc(doc(db, "outfitters", auth.currentUser.uid));
+        
+        if (outfitterDoc.exists()) {
+          const data = outfitterDoc.data();
           setOutfitterDetails({
-            name: userDoc.data().companyName || userDoc.data().name,
-            logo: userDoc.data().profileImageUrl || "",
+            name: data.companyName || data.name,
+            logo: data.profileImageUrl || "",
           });
+
+          // Evaluate Tier
+          const isPromoActive = data.promoExpiresAt && new Date(data.promoExpiresAt) > new Date();
+          const proStatus = (isPromoActive || data.tier === "PRO" || data.tier === "pro");
+          setIsProTier(proStatus);
+
+          // Evaluate Commission Rate Override
+          if (data.promoCommissionRate !== undefined && data.promoCommissionRate !== null) {
+            setCommissionRate(data.promoCommissionRate);
+            setHasPromoOverride(true);
+          } else {
+            setCommissionRate(proStatus ? 8 : 12);
+          }
         }
       } catch (err) {
         console.error("Failed to fetch outfitter details", err);
@@ -91,6 +110,13 @@ export default function CreateHuntPage() {
     });
     return () => unsubscribe();
   }, [router]);
+
+  // --- CALCULATOR MATH ---
+  const calculatedFee = formData.price * (commissionRate / 100);
+  const requiredDeposit = formData.price * (depositPercentage / 100);
+  const upfrontPayout = requiredDeposit - calculatedFee;
+  const balanceDue = formData.price - requiredDeposit;
+  const totalTakeHome = formData.price - calculatedFee;
 
   // --- HANDLERS ---
   const handleTextChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -175,19 +201,19 @@ export default function CreateHuntPage() {
         `• ${s.name} - ${s.price ? '$' + s.price : 'Price on Request'}`
       ).join("\n");
 
-      // 2. Compress & Upload Cover Image
+      // Compress & Upload Cover Image
       const fileExt = imageFile.name.split('.').pop();
       const fileName = `hunts/${auth.currentUser.uid}_${Date.now()}.${fileExt}`;
-      
       const coverImageUrl = await uploadWithCompression(imageFile, fileName);
 
-      // 3. Save to Firebase 
+      // Save to Firebase 
       await addDoc(collection(db, "hunts"), {
         outfitterId: auth.currentUser.uid,
         outfitterName: outfitterDetails.name,
         outfitterLogo: outfitterDetails.logo,
         title: formData.title,
         price: Number(formData.price),
+        depositPercentage: depositPercentage, // Save the required deposit % for checkout
         duration: Number(formData.duration),
         location: formData.location,
         
@@ -225,7 +251,6 @@ export default function CreateHuntPage() {
   return (
     <div className="relative min-h-screen pb-12 pt-6 lg:pt-10 transition-colors duration-300">
       
-      {/* INJECTED EXPLORER BACKGROUND */}
       <div 
         className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-20 dark:opacity-40"
         style={{ backgroundImage: "url('/explorer-map-bg.jpg')" }}
@@ -306,7 +331,9 @@ export default function CreateHuntPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {/* Stepper: Price */}
               <div>
-                <label className="block text-sm font-bold text-olive dark:text-off-white mb-2 flex items-center gap-2 transition-colors"><DollarSign className="h-4 w-4 text-kalahari" /> Total Price (USD)</label>
+                <label className="block text-sm font-bold text-olive dark:text-off-white mb-2 flex items-center gap-2 transition-colors">
+                  <DollarSign className="h-4 w-4 text-kalahari" /> Total Price (USD)
+                </label>
                 <div className="flex items-center h-14 bg-white/80 dark:bg-black/50 border-2 border-kalahari/50 dark:border-kalahari/30 rounded-md overflow-hidden focus-within:ring-2 focus-within:ring-olive dark:focus-within:ring-kalahari focus-within:border-transparent transition-colors">
                   <button type="button" onClick={() => setFormData(p => ({ ...p, price: Math.max(0, p.price - 500) }))} className="w-14 shrink-0 h-full bg-off-white/80 dark:bg-black/60 hover:bg-kalahari/20 dark:hover:bg-kalahari/20 flex items-center justify-center text-olive dark:text-off-white border-r-2 border-kalahari/50 dark:border-kalahari/30 transition-colors">
                     <Minus className="h-5 w-5" />
@@ -353,6 +380,76 @@ export default function CreateHuntPage() {
                   <option value="" disabled>Select Province...</option>
                   {PROVINCES.map(prov => <option key={prov} value={prov}>{prov}</option>)}
                 </select>
+              </div>
+            </div>
+
+            {/* --- THE FINANCIAL LEDGER (INJECTED) --- */}
+            <div className="bg-stone-50 dark:bg-stone-900/50 border-2 border-kalahari/20 rounded-xl p-6 shadow-inner transition-colors">
+              <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+                <h3 className="text-lg font-black flex items-center gap-2 text-olive dark:text-off-white">
+                  <Calculator className="h-5 w-5 text-kalahari" /> Pricing Breakdown & Deposits
+                </h3>
+                
+                {/* Dynamic Commission Badge */}
+                <div className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest border ${hasPromoOverride ? 'bg-purple-100 text-purple-700 border-purple-300' : isProTier ? 'bg-orange-100 text-orange-700 border-orange-300' : 'bg-gray-200 text-gray-700 border-gray-300'}`}>
+                  {commissionRate}% {hasPromoOverride ? 'Special Rate' : isProTier ? 'PRO Rate' : 'Standard Rate'}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div>
+                  <label className="block text-sm font-bold text-olive/70 dark:text-off-white/70 mb-3">Required Upfront Deposit</label>
+                  <div className="flex gap-3">
+                    {[30, 40, 50].map(pct => (
+                      <button
+                        key={pct}
+                        type="button"
+                        onClick={() => setDepositPercentage(pct)}
+                        className={`flex-1 py-3 rounded-xl font-black border-2 transition-all ${depositPercentage === pct ? 'border-kalahari bg-kalahari text-white shadow-md' : 'border-kalahari/20 text-olive/50 dark:text-white/50 hover:border-kalahari/50'}`}
+                      >
+                        {pct}%
+                      </button>
+                    ))}
+                  </div>
+                  
+                  {!isProTier && (
+                    <div className="mt-4 flex items-start gap-2 text-xs font-bold text-olive/50 dark:text-white/40">
+                      <Info className="h-4 w-4 shrink-0 text-kalahari" />
+                      <p>Standard accounts pay a 12% platform fee. Upgrade to PRO to lock in an 8% fee and keep more of your money.</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-white dark:bg-black/60 rounded-xl p-5 border border-kalahari/20 shadow-sm space-y-3">
+                  <div className="flex justify-between items-center text-sm font-bold text-olive/70 dark:text-off-white/70">
+                    <span>Total Package Price:</span>
+                    <span>${formData.price.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm font-bold text-red-500/80">
+                    <span>Platform Fee ({commissionRate}%):</span>
+                    <span>-${calculatedFee.toLocaleString()}</span>
+                  </div>
+                  <div className="border-t border-kalahari/20 pt-2 flex justify-between items-center text-base font-black text-green-600 dark:text-green-500">
+                    <span>Your Total Net Payout:</span>
+                    <span>${totalTakeHome.toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 pt-6 border-t border-kalahari/20">
+                <h4 className="text-xs font-black uppercase text-olive/50 dark:text-white/40 tracking-widest mb-4">Payment Schedule</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="bg-kalahari/10 border border-kalahari/20 rounded-lg p-4">
+                    <p className="text-xs font-bold text-olive/70 dark:text-white/60 mb-1">1. Cleared to your Bank (Upfront)</p>
+                    <p className="text-xl font-black text-olive dark:text-white">${upfrontPayout > 0 ? upfrontPayout.toLocaleString() : 0}</p>
+                    <p className="text-[10px] text-olive/50 dark:text-white/40 mt-1 font-medium">({depositPercentage}% deposit minus platform fee)</p>
+                  </div>
+                  <div className="bg-white/50 dark:bg-white/5 border border-kalahari/20 rounded-lg p-4">
+                    <p className="text-xs font-bold text-olive/70 dark:text-white/60 mb-1">2. Collected Directly on Arrival</p>
+                    <p className="text-xl font-black text-olive dark:text-white">${balanceDue.toLocaleString()}</p>
+                    <p className="text-[10px] text-olive/50 dark:text-white/40 mt-1 font-medium">(Final balance paid by hunter)</p>
+                  </div>
+                </div>
               </div>
             </div>
 

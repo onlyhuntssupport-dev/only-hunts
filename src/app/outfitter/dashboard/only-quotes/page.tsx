@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { savePricingMatrix } from "@/lib/firebase/onlyQuotesService";
 import { auth, db } from "@/lib/firebase/client";
 import { doc, getDoc } from "firebase/firestore";
-import { Save, Calculator, Plus, Trash2, X, DollarSign, CheckCircle, ShieldCheck, FileText } from "lucide-react";
+import { Save, Calculator, Plus, Trash2, DollarSign, CheckCircle, ShieldCheck, FileText } from "lucide-react";
 import KuduLoader from "@/components/ui/KuduLoader";
 
 const MASTER_SPECIES_LIST = [
@@ -37,7 +37,7 @@ export default function OnlyQuotesSetupPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  // --- MATRIX STATE ---
+  // --- MATRIX STATE (Strictly USD) ---
   const [dailyRates, setDailyRates] = useState({ hunter1v1: 0, hunter2v1: 0, observer: 0 });
   const [speciesPrices, setSpeciesPrices] = useState<Record<string, number>>({});
   const [customSpecies, setCustomSpecies] = useState<{ id: string, name: string, price: number }[]>([]);
@@ -68,11 +68,6 @@ export default function OnlyQuotesSetupPage() {
     wounded: "Wounded game is considered harvested and must be paid for in full before departure."
   });
 
-  // --- CONTEXTUAL CALCULATOR STATE ---
-  const [activeCalcId, setActiveCalcId] = useState<string | null>(null);
-  const [zarInput, setZarInput] = useState("");
-  const exchangeRate = 18.5;
-
   // --- HYDRATION: FETCH EXISTING DATA AND ENFORCE HARD LOCK ON LOAD ---
   useEffect(() => {
     const initializePage = async (user: any) => {
@@ -95,7 +90,7 @@ export default function OnlyQuotesSetupPage() {
         // If they are not Pro, instantly bounce them to billing
         if (!isPro) {
           router.replace("/outfitter/billing");
-          return; // Stop execution of the rest of the function
+          return; 
         }
 
         // 2. Fetch the actual matrix data if they are authorized
@@ -132,7 +127,7 @@ export default function OnlyQuotesSetupPage() {
       if (user) {
         initializePage(user);
       } else {
-        router.replace("/login"); // Bounce unauthenticated users too
+        router.replace("/login"); 
       }
     });
 
@@ -145,42 +140,12 @@ export default function OnlyQuotesSetupPage() {
   };
 
   const addCustomSpecies = () => setCustomSpecies([...customSpecies, { id: `custom_${Date.now()}`, name: "", price: 0 }]);
+  
   const updateCustomSpecies = (id: string, field: 'name' | 'price', value: string) => {
     setCustomSpecies(prev => prev.map(cs => cs.id === id ? { ...cs, [field]: field === 'price' ? (parseInt(value) || 0) : value } : cs));
   };
+  
   const removeCustomSpecies = (id: string) => setCustomSpecies(prev => prev.filter(cs => cs.id !== id));
-
-  const InlineCalculator = ({ fieldId, onApply }: { fieldId: string, onApply: (usd: number) => void }) => {
-    if (activeCalcId !== fieldId) return null;
-    const usdResult = Math.round((parseInt(zarInput) || 0) / exchangeRate);
-
-    return (
-      <div className="absolute right-0 top-full mt-2 w-64 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-50 p-4 animate-in fade-in zoom-in-95">
-        <div className="flex justify-between items-center mb-3">
-          <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">ZAR to USD Converter</span>
-          <button type="button" onClick={() => setActiveCalcId(null)} className="text-gray-500 hover:text-white"><X className="h-4 w-4" /></button>
-        </div>
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-gray-400 font-bold">R</span>
-          <input 
-            type="number" autoFocus placeholder="Enter ZAR..." value={zarInput} 
-            onChange={(e) => setZarInput(e.target.value)}
-            className="w-full bg-gray-800 text-white rounded outline-none px-2 py-1 focus:ring-1 focus:ring-kalahari"
-          />
-        </div>
-        <div className="flex justify-between items-center pt-2 border-t border-gray-700">
-          <span className="font-bold text-kalahari">${usdResult.toLocaleString()}</span>
-          <button 
-            type="button"
-            onClick={() => { onApply(usdResult); setActiveCalcId(null); setZarInput(""); }}
-            className="bg-kalahari text-white text-xs font-bold px-3 py-1.5 rounded hover:bg-kalahari/90 transition-colors"
-          >
-            Apply Price
-          </button>
-        </div>
-      </div>
-    );
-  };
 
   const handleSave = async () => {
     if (!auth.currentUser) return alert("You must be logged in.");
@@ -245,8 +210,6 @@ export default function OnlyQuotesSetupPage() {
               <div className="relative flex items-center bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg focus-within:ring-2 focus-within:ring-kalahari transition-all">
                 <DollarSign className="h-5 w-5 text-gray-400 ml-3 shrink-0" />
                 <input type="number" value={dailyRates.hunter1v1 || ''} onChange={(e) => setDailyRates({...dailyRates, hunter1v1: parseInt(e.target.value) || 0})} className="w-full bg-transparent text-olive dark:text-white p-3 outline-none font-bold" placeholder="0" />
-                <button type="button" onClick={() => { setActiveCalcId('hunter1v1'); setZarInput(""); }} className="p-3 text-kalahari hover:bg-kalahari/10 transition-colors border-l border-gray-200 dark:border-gray-700"><Calculator className="h-5 w-5" /></button>
-                <InlineCalculator fieldId="hunter1v1" onApply={(usd) => setDailyRates({...dailyRates, hunter1v1: usd})} />
               </div>
             </div>
             <div>
@@ -254,8 +217,6 @@ export default function OnlyQuotesSetupPage() {
               <div className="relative flex items-center bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg focus-within:ring-2 focus-within:ring-kalahari transition-all">
                 <DollarSign className="h-5 w-5 text-gray-400 ml-3 shrink-0" />
                 <input type="number" value={dailyRates.hunter2v1 || ''} onChange={(e) => setDailyRates({...dailyRates, hunter2v1: parseInt(e.target.value) || 0})} className="w-full bg-transparent text-olive dark:text-white p-3 outline-none font-bold" placeholder="0" />
-                <button type="button" onClick={() => { setActiveCalcId('hunter2v1'); setZarInput(""); }} className="p-3 text-kalahari hover:bg-kalahari/10 transition-colors border-l border-gray-200 dark:border-gray-700"><Calculator className="h-5 w-5" /></button>
-                <InlineCalculator fieldId="hunter2v1" onApply={(usd) => setDailyRates({...dailyRates, hunter2v1: usd})} />
               </div>
             </div>
             <div>
@@ -263,8 +224,6 @@ export default function OnlyQuotesSetupPage() {
               <div className="relative flex items-center bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg focus-within:ring-2 focus-within:ring-kalahari transition-all">
                 <DollarSign className="h-5 w-5 text-gray-400 ml-3 shrink-0" />
                 <input type="number" value={dailyRates.observer || ''} onChange={(e) => setDailyRates({...dailyRates, observer: parseInt(e.target.value) || 0})} className="w-full bg-transparent text-olive dark:text-white p-3 outline-none font-bold" placeholder="0" />
-                <button type="button" onClick={() => { setActiveCalcId('observer'); setZarInput(""); }} className="p-3 text-kalahari hover:bg-kalahari/10 transition-colors border-l border-gray-200 dark:border-gray-700"><Calculator className="h-5 w-5" /></button>
-                <InlineCalculator fieldId="observer" onApply={(usd) => setDailyRates({...dailyRates, observer: usd})} />
               </div>
             </div>
           </div>
@@ -283,10 +242,8 @@ export default function OnlyQuotesSetupPage() {
               <div key={species.id} className="flex items-center justify-between py-2 border-b border-kalahari/10">
                 <span className="font-bold text-olive dark:text-off-white">{species.name}</span>
                 <div className="relative flex items-center w-36 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md focus-within:ring-1 focus-within:ring-kalahari">
-                  <span className="text-gray-400 ml-2 font-bold">$</span>
+                  <span className="text-gray-400 ml-3 font-bold">$</span>
                   <input type="number" value={speciesPrices[species.id] || ''} onChange={(e) => handlePriceChange(species.id, e.target.value)} className="w-full bg-transparent text-olive dark:text-white p-2 outline-none font-bold text-right" placeholder="0" />
-                  <button type="button" onClick={() => { setActiveCalcId(species.id); setZarInput(""); }} className="p-2 text-kalahari hover:bg-kalahari/10 border-l border-gray-200 dark:border-gray-700"><Calculator className="h-4 w-4" /></button>
-                  <InlineCalculator fieldId={species.id} onApply={(usd) => setSpeciesPrices({...speciesPrices, [species.id]: usd})} />
                 </div>
               </div>
             ))}
@@ -302,10 +259,8 @@ export default function OnlyQuotesSetupPage() {
               <div key={cs.id} className="flex flex-col sm:flex-row items-center gap-4 bg-gray-50 dark:bg-gray-900 p-3 rounded-xl border border-gray-200 dark:border-gray-800">
                 <input type="text" placeholder="e.g. Golden Wildebeest" value={cs.name} onChange={(e) => updateCustomSpecies(cs.id, 'name', e.target.value)} className="w-full sm:flex-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-olive dark:text-white rounded-lg p-2.5 outline-none focus:ring-1 focus:ring-kalahari font-bold" />
                 <div className="w-full sm:w-48 relative flex items-center bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus-within:ring-1 focus-within:ring-kalahari shrink-0">
-                  <span className="text-gray-400 ml-2 font-bold">$</span>
-                  <input type="number" placeholder="0" value={cs.price || ''} onChange={(e) => updateCustomSpecies(cs.id, 'price', e.target.value)} className="w-full bg-transparent text-olive dark:text-white p-2.5 outline-none font-bold text-right" />
-                  <button type="button" onClick={() => { setActiveCalcId(cs.id); setZarInput(""); }} className="p-2.5 text-kalahari hover:bg-kalahari/10 border-l border-gray-200 dark:border-gray-700"><Calculator className="h-4 w-4" /></button>
-                  <InlineCalculator fieldId={cs.id} onApply={(usd) => updateCustomSpecies(cs.id, 'price', usd.toString())} />
+                  <span className="text-gray-400 ml-3 font-bold">$</span>
+                  <input type="number" placeholder="0" value={cs.price || ''} onChange={(e) => updateCustomSpecies(cs.id, 'price', e.target.value)} className="w-full bg-transparent text-olive dark:text-white p-2.5 outline-none font-bold text-right pr-4" />
                 </div>
                 <button type="button" onClick={() => removeCustomSpecies(cs.id)} className="p-3 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors" title="Remove"><Trash2 className="h-5 w-5" /></button>
               </div>
@@ -377,9 +332,9 @@ export default function OnlyQuotesSetupPage() {
                 />
                 <div>
                   <span className="block text-sm text-olive dark:text-white font-bold group-hover:text-kalahari transition-colors">
-                    15% VAT Inclusive
+                    Regional Taxes / VAT Inclusive
                   </span>
-                  <span className="block text-xs text-olive/60 dark:text-off-white/50 mt-1">Check this if your USD prices above already include South African VAT.</span>
+                  <span className="block text-xs text-olive/60 dark:text-off-white/50 mt-1">Check this if your USD prices above already include regional taxes or VAT for your operating country.</span>
                 </div>
               </label>
             </div>
@@ -419,7 +374,7 @@ export default function OnlyQuotesSetupPage() {
           </div>
         </section>
 
-        {/* SAVE BAR (Fixed to bottom, not floating) */}
+        {/* SAVE BAR */}
         <div className="mt-8 bg-white dark:bg-gray-900 border-2 border-kalahari/30 rounded-2xl p-6 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4 transition-colors">
           <div className="text-olive/70 dark:text-gray-400 text-sm font-bold text-center sm:text-left">
             Remember to save your changes to update live quotes.
