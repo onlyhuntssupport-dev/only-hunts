@@ -1,11 +1,13 @@
+
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  // Externalize firebase-admin to prevent bundling issues on the server
-  serverExternalPackages: ['firebase-admin'],
+  // Externalize firebase and firebase-admin to prevent bundling issues on the server
+  // especially when client SDKs are pre-rendered or used in server actions.
+  serverExternalPackages: ['firebase-admin', 'firebase'],
   allowedDevOrigins: [
     "localhost:9003",
-    "9003-firebase-studio-1771862059110.cluster-lu4mup47g5gm4rtyvhzpwbfadi.cloudworkstations.dev",
+    "9003-firebase-studio-1771862059110.cluster-lu4mup47g5gm4rtyvhzpwbfadi.cluster-lu4mup47g5gm4rtyvhzpwbfadi.cloudworkstations.dev",
     "*.cluster-lu4mup47g5gm4rtyvhzpwbfadi.cluster-lu4mup47g5gm4rtyvhzpwbfadi.cloudworkstations.dev",
     "*.cloudworkstations.dev"
   ],
@@ -47,10 +49,8 @@ const nextConfig: NextConfig = {
     ],
   },
   webpack: (config, { dev }) => {
-    // Force memory cache to prevent Cloud Workstation disk I/O / sync issues
-    config.cache = {
-      type: 'memory',
-    };
+    // Disable webpack cache if we are hitting sync issues in Cloud Workstations
+    config.cache = false;
     
     // Disable source maps in production to prevent 404 log spam and reduce bundle size
     if (!dev) {
