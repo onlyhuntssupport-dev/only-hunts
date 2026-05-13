@@ -16,18 +16,17 @@ export default function Footer() {
     <footer className="bg-black/90 border-t-2 border-kalahari/20 pt-16 pb-8 mt-auto z-20 relative text-off-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
-        {/* TOP ROW: 3 Columns */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mb-12">
           
-          {/* Col 1: Brand & Hook */}
           <div className="flex flex-col items-center md:items-start text-center md:text-left">
             <Link href="/" className="mb-4">
+              {/* ASPECT RATIO FIX: width 96 / 1.24 natural ratio = 77 height */}
               <Image 
                 src="/logo-transparent.png" 
                 alt="Only-Hunts Logo" 
                 width={96} 
-                height={96} 
-                className="drop-shadow-[0_0_10px_rgba(209,164,123,0.3)]"
+                height={77} 
+                className="w-24 h-auto drop-shadow-[0_0_10px_rgba(209,164,123,0.3)]"
               />
             </Link>
             <p className="text-sm text-off-white/70 font-medium max-w-xs">
@@ -35,7 +34,6 @@ export default function Footer() {
             </p>
           </div>
 
-          {/* Col 2: Quick Links */}
           <div className="flex flex-col items-center md:items-start">
             <h4 className="text-kalahari font-black uppercase tracking-widest text-xs mb-6">Explore</h4>
             <nav className="flex flex-col space-y-3 text-sm font-bold">
@@ -46,13 +44,10 @@ export default function Footer() {
             </nav>
           </div>
 
-          {/* Col 3: Social & Contact */}
           <div className="flex flex-col items-center md:items-start">
             <h4 className="text-kalahari font-black uppercase tracking-widest text-xs mb-6">Connect</h4>
             
-            {/* Social Icons Container */}
             <div className="flex space-x-4 mb-6">
-              {/* Active Links with Proxy Bypass */}
               <a 
                 href="https://x.com/Only_Hunts" 
                 onClick={(e) => handleExternalLink(e, "https://x.com/Only_Hunts")}
@@ -90,7 +85,6 @@ export default function Footer() {
 
         </div>
 
-        {/* BOTTOM ROW: Copyright & Legal */}
         <div className="pt-8 border-t border-kalahari/10 flex flex-col md:flex-row justify-between items-center text-xs text-off-white/40 font-bold uppercase tracking-widest gap-4 mb-6">
           <p>&copy; {currentYear} Only-Hunts. All rights reserved.</p>
           <div className="flex space-x-6">
@@ -109,7 +103,6 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* AI DISCLAIMER ROW */}
         <div className="text-center pb-2">
           <p className="text-[10px] text-off-white/30 italic font-medium tracking-wide">
             *Conceptual imagery on this platform may include AI-generated or synthetic media.

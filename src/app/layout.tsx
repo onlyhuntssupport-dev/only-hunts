@@ -1,9 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/ui/Footer"; 
-import WhatsAppWidget from "@/components/ui/WhatsAppWidget"; 
-import EndorsementBanner from "@/components/marketplace/EndorsementBanner"; 
+import { ClientEndorsementBanner, ClientWhatsAppWidget } from "@/components/ClientFirebaseWrappers";
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://only-hunts.com'),
@@ -41,6 +40,12 @@ export const metadata: Metadata = {
   }
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5, // Accessibility fix: allows zooming
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -50,6 +55,11 @@ export default function RootLayout({
     <html lang="en" className="dark" suppressHydrationWarning>
       <head>
         <link rel="manifest" href="/manifest.json" crossOrigin="use-credentials" />
+        
+        {/* PERFORMANCE FIX: Preconnect to external domains to eliminate connection setup time */}
+        <link rel="preconnect" href="https://firebase.googleapis.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://firestore.googleapis.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://www.gstatic.com" crossOrigin="anonymous" />
       </head>
       <body className="antialiased min-h-screen bg-olive text-off-white flex flex-col font-body" suppressHydrationWarning>
         
@@ -62,13 +72,13 @@ export default function RootLayout({
         </main>
 
         {/* --- GLOBAL PRE-FOOTER TRUST SIGNAL --- */}
-        <EndorsementBanner />
+        <ClientEndorsementBanner />
 
         {/* --- GLOBAL FOOTER --- */}
         <Footer />
 
         {/* --- GLOBAL FLOATING WIDGETS --- */}
-        <WhatsAppWidget />
+        <ClientWhatsAppWidget />
 
       </body>
     </html>

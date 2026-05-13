@@ -147,7 +147,7 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-20">
           
-          <Link href="/" className="flex items-center gap-3 group">
+          <Link prefetch={false} href="/" className="flex items-center gap-3 group">
             <Image 
               src="/logo-transparent.png" 
               alt="Only-Hunts Logo" 
@@ -166,7 +166,7 @@ export default function Navbar() {
             {!isDashboard && (
               <>
                 <Button asChild variant="ghost" className="text-olive dark:text-off-white dark:text-kalahari font-bold hover:bg-kalahari/10 hover:text-olive dark:text-off-white dark:hover:text-off-white text-sm sm:text-base flex px-2 sm:px-4 transition-colors">
-                  <Link href="/marketplace">
+                  <Link prefetch={false} href="/marketplace">
                     <Compass className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Marketplace</span>
                   </Link>
                 </Button>
@@ -185,7 +185,7 @@ export default function Navbar() {
                     <SupportModal variant="header" />
 
                     {hasUnreadMessages && (
-                      <Link href="/messages" className="relative p-2 rounded-full hover:bg-kalahari/10 transition-colors group flex items-center justify-center mr-1">
+                      <Link prefetch={false} href="/messages" className="relative p-2 rounded-full hover:bg-kalahari/10 transition-colors group flex items-center justify-center mr-1">
                         <svg 
                           viewBox="0 0 120 40" 
                           fill="currentColor" 
@@ -245,7 +245,7 @@ export default function Navbar() {
                               <LayoutDashboard className="h-4 w-4 mr-3 text-kalahari" /> Dashboard
                             </button>
 
-                            <Link 
+                            <Link prefetch={false} 
                               href="/messages" 
                               onClick={() => setDropdownOpen(false)}
                               className="flex items-center px-3 py-2 text-sm font-bold text-olive dark:text-off-white/80 hover:text-olive dark:hover:text-kalahari hover:bg-kalahari/10 rounded-lg transition-colors"
@@ -254,7 +254,7 @@ export default function Navbar() {
                             </Link>
 
                             {role === "OUTFITTER" ? (
-                              <Link 
+                              <Link prefetch={false} 
                                 href="/outfitter/billing" 
                                 onClick={() => setDropdownOpen(false)}
                                 className="flex items-center px-3 py-2 text-sm font-bold text-olive dark:text-off-white/80 hover:text-olive dark:hover:text-kalahari hover:bg-kalahari/10 rounded-lg transition-colors"
@@ -262,7 +262,7 @@ export default function Navbar() {
                                 <Briefcase className="h-4 w-4 mr-3 text-kalahari" /> Billing & Plans
                               </Link>
                             ) : role === "ADMIN" || role === "SUPER_ADMIN" ? (
-                              <Link 
+                              <Link prefetch={false} 
                                 href="/admin" 
                                 onClick={() => setDropdownOpen(false)}
                                 className="flex items-center px-3 py-2 text-sm font-bold text-olive dark:text-off-white/80 hover:text-olive dark:hover:text-kalahari hover:bg-kalahari/10 rounded-lg transition-colors"
@@ -271,14 +271,14 @@ export default function Navbar() {
                               </Link>
                             ) : (
                               <>
-                                <Link 
+                                <Link prefetch={false} 
                                   href="/hunter/dashboard#inquiries" 
                                   onClick={() => setDropdownOpen(false)}
                                   className="flex items-center px-3 py-2 text-sm font-bold text-olive dark:text-off-white/80 hover:text-olive dark:hover:text-kalahari hover:bg-kalahari/10 rounded-lg transition-colors"
                                 >
                                   <Target className="h-4 w-4 mr-3 text-kalahari" /> My Bookings
                                 </Link>
-                                <Link 
+                                <Link prefetch={false} 
                                   href="/hunter/dashboard/wishlist" 
                                   onClick={() => setDropdownOpen(false)}
                                   className="flex items-center px-3 py-2 text-sm font-bold text-olive dark:text-off-white/80 hover:text-olive dark:hover:text-kalahari hover:bg-kalahari/10 rounded-lg transition-colors"
@@ -288,7 +288,7 @@ export default function Navbar() {
                               </>
                             )}
 
-                            <Link 
+                            <Link prefetch={false} 
                               href={role === "OUTFITTER" ? "/outfitter/dashboard/settings" : role === "ADMIN" || role === "SUPER_ADMIN" ? "/admin/settings" : "/hunter/dashboard/settings"} 
                               onClick={() => setDropdownOpen(false)}
                               className="flex items-center px-3 py-2 text-sm font-bold text-olive dark:text-off-white/80 hover:text-olive dark:hover:text-kalahari hover:bg-kalahari/10 rounded-lg transition-colors"
@@ -314,12 +314,12 @@ export default function Navbar() {
                 ) : (
                   <>
                     <Button asChild variant="ghost" className="text-olive dark:text-off-white dark:text-kalahari font-bold hover:bg-kalahari/10 transition-colors">
-                      <Link href="/login">
+                      <Link prefetch={false} href="/login">
                         Sign In
                       </Link>
                     </Button>
                     <Button asChild className="bg-olive dark:bg-kalahari hover:bg-olive/90 dark:hover:bg-kalahari/90 text-kalahari dark:text-olive dark:text-off-white font-black shadow-md transition-colors">
-                      <Link href="/signup">
+                      <Link prefetch={false} href="/signup">
                         Sign Up
                       </Link>
                     </Button>

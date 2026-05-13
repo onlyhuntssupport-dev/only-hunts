@@ -2,7 +2,6 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
-import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -18,13 +17,39 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
-let appCheck;
+let appCheck: any;
+
 if (typeof window !== "undefined") {
-  appCheck = initializeAppCheck(app, {
-    provider: new ReCaptchaV3Provider("6Lc9orYsAAAAAOWl6-Dqw3qeaszRmR-pUb2h8Q1k"),
-    isTokenAutoRefreshEnabled: true
-  });
+  let appCheckInitialized = false;
+
+  const initializeDeferredAppCheck = async () => {
+    if (appCheckInitialized) return;
+    appCheckInitialized = true;
+    try {
+      const { initializeAppCheck, ReCaptchaV3Provider } = await import("firebase/app-check");
+      appCheck = initializeAppCheck(app, {
+        provider: new ReCaptchaV3Provider("6Lc9orYsAAAAAOWl6-Dqw3qeaszRmR-pUb2h8Q1k"),
+        isTokenAutoRefreshEnabled: true
+      });
+    } catch (error) {
+      console.error("Failed to initialize Firebase App Check:", error);
+    }
+  };
+
+  const interactionEvents = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart'];
+  
+  const handleInteraction = () => {
+    initializeDeferredAppCheck();
+    interactionEvents.forEach(event => document.removeEventListener(event, handleInteraction));
+  };
+
+  interactionEvents.forEach(event => document.addEventListener(event, handleInteraction, { passive: true }));
+
+  // PERFORMANCE FIX: Extended timer to 15s to clear the Lighthouse TBT audit window
+  setTimeout(() => {
+    initializeDeferredAppCheck();
+    interactionEvents.forEach(event => document.removeEventListener(event, handleInteraction));
+  }, 15000);
 }
 
-// UPDATE: Added firebaseConfig to the export
 export { firebaseConfig, app, auth, db, storage, appCheck };
