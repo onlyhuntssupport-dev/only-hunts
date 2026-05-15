@@ -1,16 +1,15 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
-import PlatformNotification from "@/components/emails/PlatformNotification";
 import * as admin from "firebase-admin";
+import { readFileSync } from "fs";
+import { join } from "path";
 
 // --- SECURE FIREBASE ADMIN INITIALIZATION ---
-// Prevents Next.js hot-reloading from initializing Firebase multiple times
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert({
       projectId: process.env.FIREBASE_PROJECT_ID,
       clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      // The replace method ensures newline characters in the env file format correctly
       privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
     }),
   });
@@ -30,7 +29,6 @@ export async function POST(request: Request) {
     const token = authHeader.split("Bearer ")[1];
     
     try {
-      // Verify the token belongs to a real, authenticated Only-Hunts user
       await admin.auth().verifyIdToken(token);
     } catch (err) {
       console.error("Token verification failed:", err);
@@ -40,19 +38,39 @@ export async function POST(request: Request) {
 
     // --- 2. PROCESS THE EMAIL ---
     const body = await request.json();
-    const { to, subject, userName, title, message, ctaText, ctaLink } = body;
+    
+    // We now expect a templateName (e.g., 'booking-request') and an object of dynamic variables
+    const { to, subject, templateName, variables } = body;
 
-    // Basic validation
-    if (!to || !subject || !message) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    if (!to || !subject || !templateName) {
+      return NextResponse.json({ error: "Missing required fields: to, subject, or templateName" }, { status: 400 });
     }
 
-    // Send the email using the React template
+    // --- 3. READ AND COMPILE THE HTML TEMPLATE ---
+    let htmlContent = "";
+    try {
+      // Point directly to the emails folder at the root of the project
+      const filePath = join(process.cwd(), "emails", `${templateName}.html`);
+      htmlContent = readFileSync(filePath, "utf-8");
+      
+      // Inject the dynamic variables (replaces {{KEY}} with actual values)
+      if (variables && typeof variables === "object") {
+        for (const [key, value] of Object.entries(variables)) {
+          const regex = new RegExp(`{{${key}}}`, "g");
+          htmlContent = htmlContent.replace(regex, String(value));
+        }
+      }
+    } catch (fsError) {
+      console.error("Template read error:", fsError);
+      return NextResponse.json({ error: "Failed to load the requested email template." }, { status: 500 });
+    }
+
+    // --- 4. SEND THE EMAIL ---
     const { data, error } = await resend.emails.send({
-      from: "Only-Hunts <onboarding@resend.dev>", // Update once domain is verified in Resend
+      from: "Only-Hunts <onboarding@resend.dev>", // Update once domain is verified
       to: [to], 
       subject: subject,
-      react: PlatformNotification({ userName, title, message, ctaText, ctaLink }),
+      html: htmlContent, // Sending raw HTML instead of the React component
     });
 
     if (error) {

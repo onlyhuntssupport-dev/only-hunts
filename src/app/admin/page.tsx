@@ -119,7 +119,8 @@ export default function AdminTeamDashboard() {
 
     try {
       setIsUpdatingRole(true);
-      const response = await updateAdminRole(adminId, newRole);
+      const performedBy = currentUserEmail || "Unknown Admin";
+      const response = await updateAdminRole(adminId, newRole, performedBy);
 
       if (response && response.success) {
         await loadData();

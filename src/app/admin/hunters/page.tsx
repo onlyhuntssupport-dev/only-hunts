@@ -52,9 +52,11 @@ export default function AdminHuntersDashboard() {
     if (!window.confirm(confirmMsg)) return;
 
     setIsSuspending(true);
+    const adminEmail = auth.currentUser?.email || "Unknown Admin";
+    
     const res = isCurrentlySuspended 
-      ? await reinstateUser(selectedEntity.id)
-      : await suspendUser(selectedEntity.id);
+      ? await reinstateUser(selectedEntity.id, adminEmail)
+      : await suspendUser(selectedEntity.id, adminEmail);
     
     if (res.success) {
       const newStatus = isCurrentlySuspended ? "ACTIVE" : "SUSPENDED";
@@ -76,7 +78,9 @@ export default function AdminHuntersDashboard() {
 
     setIsDeleting(true);
     try {
-      const res = await deleteHunter(selectedEntity.id);
+      const adminEmail = auth.currentUser?.email || "Unknown Admin";
+      const res = await deleteHunter(selectedEntity.id, adminEmail);
+      
       if (res.success) {
         // Remove from local state instantly to update the table
         setHunters(hunters.filter(e => e.id !== selectedEntity.id));

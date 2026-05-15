@@ -16,7 +16,8 @@ export default async function ApprovalsPage() {
   // --- SECURE AUDIT LOGGING: Extract current admin email from secure cookie ---
   let adminEmail = "Unknown Admin";
   try {
-    const token = cookies().get('AuthToken')?.value;
+    const cookieStore = await cookies();
+    const token = cookieStore.get('AuthToken')?.value;
     if (token) {
       // Try verifying as ID token, fallback to Session Cookie if needed
       const decoded = await adminAuth.verifyIdToken(token).catch(() => adminAuth.verifySessionCookie(token));

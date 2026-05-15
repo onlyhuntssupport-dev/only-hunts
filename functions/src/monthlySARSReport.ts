@@ -12,7 +12,7 @@ const db = admin.firestore();
 export const monthlySARSReport = onSchedule(
   {
     schedule: "0 2 1 * *", // 2:00 AM on the 1st of every month
-    timezone: "Africa/Johannesburg", // Strict SAST execution for accurate tax cutoffs
+    timeZone: "Africa/Johannesburg", // Strict SAST execution for accurate tax cutoffs
     secrets: ["RESEND_API_KEY"],
   },
   async (event) => {

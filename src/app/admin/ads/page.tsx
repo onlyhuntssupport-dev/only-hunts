@@ -65,7 +65,7 @@ export default function AdminAdsDashboard() {
       // --- NEW: INVOICE GENERATION & EMAIL DISPATCH ---
       try {
         // Retrieve the newly created campaign ID from your server action
-        const campaignId = res.data?.id || res.id; 
+        const campaignId = res.id; 
         
         if (campaignId) {
           const amountCentsZAR = parseInt(newBillingAmount) * 100;
