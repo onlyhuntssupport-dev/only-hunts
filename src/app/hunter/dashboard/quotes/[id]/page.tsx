@@ -1,149 +1,151 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore'; 
+import { doc, onSnapshot } from 'firebase/firestore'; 
 import { db, auth } from '@/lib/firebase/client';
-import { declineCustomQuote } from '@/lib/firebase/quoteService'; 
-import { initializeHuntBooking } from '@/app/actions/paystack'; // NEW: Import the payment gateway
+import { initializeHuntBooking } from '@/app/actions/paystack';
 
-// Mocking the initial data fetch for UI building purposes. 
-const mockQuote = {
-  id: 'quote_98765',
-  outfitterId: 'mock_outfitter_id_123', // Added so the payment gateway has a destination
-  outfitterName: 'Bushveld Safaris',
-  status: 'PENDING_HUNTER_ACCEPTANCE',
-  logistics: { days: 7, hunters: 2, observers: 1 },
-  financials: { baseRateTotal: 6300, trophyFeeTotal: 4500, totalUsd: 10800, isVatInclusive: true },
-  lineItems: [
-    { description: '2 Hunter(s) x 7 Days', quantity: 14, unitPrice: 350, total: 4900 },
-    { description: '1 Observer(s) x 7 Days', quantity: 7, unitPrice: 200, total: 1400 },
-    { description: 'Trophy Fee: Kudu (Bull)', quantity: 1, unitPrice: 2500, total: 2500 },
-    { description: 'Trophy Fee: Gemsbok / Oryx', quantity: 1, unitPrice: 1200, total: 1200 },
-    { description: 'Trophy Fee: Springbok', quantity: 1, unitPrice: 800, total: 800 },
-  ],
-  terms: { includesAccommodation: true, includesMeals: true, woundedGamePolicyApplies: true },
-  expiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString(),
-};
+interface PageProps {
+  params: Promise<{ id: string }>;
+}
 
-export default function HunterQuoteReviewPage() {
+interface QuoteData {
+  id: string;
+  outfitterId: string;
+  outfitterName: string;
+  outfitterEmail: string;
+  hunterId: string; // Enforces data isolation
+  status: string;
+  logistics: { days: number; hunters: number; observers: number };
+  financials: { baseRateTotal: number; trophyFeeTotal: number; totalUsd: number; isVatInclusive: boolean };
+  lineItems: Array<{ description: string; quantity: number; unitPrice: number; total: number }>;
+  terms: { includesAccommodation: boolean; includesMeals: boolean; woundedGamePolicyApplies: boolean };
+  expiresAt?: string;
+}
+
+export default function HunterQuoteReviewPage({ params }: PageProps) {
+  const { id } = React.use(params);
   const router = useRouter(); 
-  const [quote, setQuote] = useState(mockQuote);
+  
+  const [quote, setQuote] = useState<QuoteData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [unauthorized, setUnauthorized] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [signature, setSignature] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // The LIVE Acceptance Function
+  // Live Sync Stream with Firestore
+  useEffect(() => {
+    if (!id) return;
+
+    const quoteRef = doc(db, 'quotes', id);
+    
+    const unsubscribe = onSnapshot(quoteRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        
+        // Security Checkpoint: Verify current user owns this quote resource
+        if (auth.currentUser && data.hunterId !== auth.currentUser.uid) {
+          setUnauthorized(true);
+        } else {
+          setQuote({ id: docSnap.id, ...data } as QuoteData);
+        }
+      } else {
+        setQuote(null);
+      }
+      setLoading(false);
+    }, (error) => {
+      console.error("Firestore real-time subscription sync failed:", error);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [id]);
+
+  // Handle Authentication State Shifts Securely
+  useEffect(() => {
+    if (!loading && quote && auth.currentUser) {
+      if (quote.hunterId !== auth.currentUser.uid) {
+        setUnauthorized(true);
+      }
+    }
+  }, [loading, quote]);
+
   const handleAcceptQuote = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!auth.currentUser?.email || !auth.currentUser?.uid) {
-      alert("Please log in to accept this quote.");
+    if (!auth.currentUser?.email || !auth.currentUser?.uid || unauthorized) {
+      alert("Unauthorized operational state. Access denied.");
       return;
     }
 
     setIsProcessing(true);
 
     try {
-      const outfitterEmail = 'admin@bushveldsafaris.com'; 
-      
-      // 1. Write digital signature to Firestore to formally accept the terms
-      const quoteRef = doc(db, 'quotes', quote.id);
-      await setDoc(quoteRef, {
-        status: 'ACCEPTED_AWAITING_DEPOSIT', // Updated status to reflect pending payment
-        acceptedBy: signature,
-        outfitterEmail: outfitterEmail,
-        acceptedAt: serverTimestamp(),
-        outfitterName: quote.outfitterName,
-        logistics: quote.logistics,
-        financials: quote.financials,
-        lineItems: quote.lineItems,
-        terms: quote.terms,
-      }, { merge: true });
-
-      // --- 2. EMAIL ENGINE DISPATCH (SILENT FAILSAFE) ---
-      try {
-        const idToken = await auth.currentUser.getIdToken(true);
-        const hunterName = auth.currentUser.displayName || signature || "Your client";
-
-        await fetch("/api/email", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${idToken}`
-          },
-          body: JSON.stringify({
-            to: outfitterEmail,
-            subject: `Quote Accepted: ${hunterName} Locked In`,
-            userName: quote.outfitterName,
-            title: "Safari Booking Confirmed!",
-            message: `Great news! ${hunterName} has accepted your custom quote and digitally signed the terms. The booking for $${quote.financials.totalUsd.toLocaleString()} USD is now locked in. Log in to your dashboard to view the final itinerary and prepare for their arrival.`,
-            ctaText: "View Confirmed Booking",
-            ctaLink: "https://www.only-hunts.com/outfitter/dashboard",
-          }),
-        });
-      } catch (emailErr) {
-        console.error("Silent failure: Email engine dropped the outfitter notification", emailErr);
-      }
-
-      // --- 3. PAYSTACK PAYMENT GATEWAY INIT ---
-      // We assume a standard 30% deposit for custom quotes unless specified otherwise
+      // 1. Initialize Paystack Transaction Payload
       const depositPct = 30; 
-      const depositDueUSD = quote.financials.totalUsd * (depositPct / 100);
-      const EXCHANGE_RATE = 19.00; // Fixed estimate for ZAR conversion
+      const depositDueUSD = quote!.financials.totalUsd * (depositPct / 100);
+      const EXCHANGE_RATE = 19.00; // Aligned platform fallback margin rate
       const amountCentsZAR = depositDueUSD * EXCHANGE_RATE * 100;
 
       const res = await initializeHuntBooking(
         auth.currentUser.email,
-        quote.id, // Custom Quotes use their Quote ID as the Hunt ID for tracking
-        quote.outfitterId, 
+        quote!.id, 
+        quote!.outfitterId, 
         amountCentsZAR,
-        quote.financials.totalUsd,
+        quote!.financials.totalUsd,
         depositPct,
-        auth.currentUser.uid, // NEW: Passed to webhook for receipt generation
-        `Custom Safari Quote: ${quote.outfitterName}` // NEW: Passed to webhook for PDF Title
+        auth.currentUser.uid, 
+        `Safari Booking Deposit: ${quote!.outfitterName}` 
       );
 
-      // Redirect directly to Paystack to secure the deposit
+      // 2. Client handoff directly out to Paystack Security Gateway Engine
       if (res.authorizationUrl) {
         window.location.href = res.authorizationUrl;
       } else {
-        throw new Error("Failed to retrieve payment URL");
+        throw new Error("Invalid checkout redirect routing returned by gateway.");
       }
       
     } catch (error: any) {
-      console.error("Error accepting quote:", error);
-      alert("An unexpected error occurred: " + error.message);
+      console.error("Critical gateway failure handling acceptance:", error);
+      alert("An unexpected processing error occurred: " + error.message);
       setIsProcessing(false); 
     } 
   };
 
-  // The LIVE Decline Function
-  const handleDeclineQuote = async () => {
-    if (confirm("Are you sure you want to decline this custom quote?")) {
-      setIsProcessing(true);
-      try {
-         const quoteRef = doc(db, 'quotes', quote.id);
-         await setDoc(quoteRef, {
-           status: 'DECLINED',
-           declinedAt: serverTimestamp(),
-         }, { merge: true });
-         
-         router.push('/hunter/dashboard'); 
-      } catch (error) {
-        console.error("Error declining quote:", error);
-        alert("Error declining quote.");
-        setIsProcessing(false);
-      }
-    }
-  };
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-4xl p-6 space-y-6 animate-pulse">
+        <div className="h-10 w-2/3 bg-gray-800 rounded"></div>
+        <div className="h-32 bg-gray-800 rounded"></div>
+        <div className="h-64 bg-gray-800 rounded"></div>
+      </div>
+    );
+  }
 
-  if (!quote) return <div className="p-10 text-center text-white">Loading Quote...</div>;
+  if (unauthorized) {
+    return (
+      <div className="mx-auto max-w-4xl p-10 text-center text-red-400 border border-red-900 rounded-lg bg-red-950/20 my-10">
+        <h2 className="text-2xl font-bold mb-2">Access Violations Triggered</h2>
+        <p className="text-gray-400">You are not authorized to evaluate this custom safari package pricing asset.</p>
+      </div>
+    );
+  }
+
+  if (!quote) {
+    return (
+      <div className="mx-auto max-w-4xl p-10 text-center text-gray-400 border border-gray-700 rounded-lg bg-gray-800/50 my-10">
+        <h2 className="text-2xl font-bold mb-2">Proposal Defunct</h2>
+        <p>The requested contract reference does not match an active record inside the system architecture.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-4xl p-6 relative pb-24">
       
-      {/* Header & Status */}
+      {/* Header & Status Control Panels */}
       <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between border-b border-gray-700 pb-6">
         <div>
           <h1 className="text-3xl font-bold text-white">Custom Safari Proposal</h1>
@@ -151,17 +153,17 @@ export default function HunterQuoteReviewPage() {
         </div>
         <div className="mt-4 md:mt-0 text-right">
           <span className={`inline-block rounded-full px-4 py-1.5 text-sm font-bold ${
-            quote.status.includes('ACCEPTED') ? 'bg-green-500/20 text-green-400 border border-green-500/50' : 
+            quote.status.includes('ACCEPTED') || quote.status === 'DEPOSIT_SECURED' ? 'bg-green-500/20 text-green-400 border border-green-500/50' : 
             quote.status === 'DECLINED' ? 'bg-red-500/20 text-red-400 border border-red-500/50' : 
             'bg-orange-500/20 text-orange-400 border border-orange-500/50'
           }`}>
             {quote.status.replace(/_/g, ' ')}
           </span>
-          <p className="text-xs text-gray-500 mt-2">Valid until: {quote.expiresAt}</p>
+          {quote.expiresAt && <p className="text-xs text-gray-500 mt-2">Valid until: {quote.expiresAt}</p>}
         </div>
       </div>
 
-      {/* Logistics Summary */}
+      {/* Logistics Configuration Grid */}
       <section className="mb-8 grid grid-cols-3 gap-4 rounded-lg bg-gray-800 p-6 shadow-md border border-gray-700">
         <div className="text-center border-r border-gray-700 last:border-0">
           <p className="text-sm text-gray-400">Duration</p>
@@ -177,7 +179,7 @@ export default function HunterQuoteReviewPage() {
         </div>
       </section>
 
-      {/* Financial Breakdown (The Line Items) */}
+      {/* Financial Breakdown Table Container */}
       <section className="mb-8 rounded-lg bg-gray-800 p-6 shadow-md border border-gray-700">
         <h2 className="mb-4 text-xl font-semibold text-white">Financial Breakdown (USD)</h2>
         <div className="overflow-x-auto">
@@ -191,7 +193,7 @@ export default function HunterQuoteReviewPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-700">
-              {quote.lineItems.map((item, index) => (
+              {quote.lineItems?.map((item, index) => (
                 <tr key={index} className="hover:bg-gray-700/50 transition-colors">
                   <td className="py-4">{item.description}</td>
                   <td className="py-4 text-right">{item.quantity}</td>
@@ -203,7 +205,7 @@ export default function HunterQuoteReviewPage() {
           </table>
         </div>
 
-        {/* Grand Total */}
+        {/* Grand Total Execution Layout */}
         <div className="mt-6 flex flex-col items-end border-t border-gray-700 pt-6">
           <p className="text-sm text-gray-400 mb-1">{quote.financials.isVatInclusive ? 'Prices are 15% VAT Inclusive' : 'Prices are VAT Exclusive'}</p>
           <div className="flex items-center gap-4">
@@ -213,7 +215,7 @@ export default function HunterQuoteReviewPage() {
         </div>
       </section>
 
-      {/* Amenities Included */}
+      {/* Amenities Ground Verification Block */}
       <section className="mb-8 rounded-lg bg-gray-800 p-6 shadow-md border border-gray-700">
         <h2 className="mb-4 text-lg font-semibold text-white">Included in Daily Rate</h2>
         <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-gray-300">
@@ -226,7 +228,7 @@ export default function HunterQuoteReviewPage() {
         </ul>
       </section>
 
-      {/* Acceptance & Liability Shield (Only shows if Pending) */}
+      {/* Acceptance Interface Framework (Rendered conditionally based on status) */}
       {quote.status === 'PENDING_HUNTER_ACCEPTANCE' && (
         <form onSubmit={handleAcceptQuote} className="rounded-lg border border-orange-900 bg-gray-900 p-6 shadow-xl">
           <h2 className="mb-4 text-xl font-semibold text-orange-500">Confirm & Accept Safari</h2>
@@ -264,17 +266,9 @@ export default function HunterQuoteReviewPage() {
 
           <div className="flex gap-4">
             <button 
-              type="button"
-              onClick={handleDeclineQuote}
-              disabled={isProcessing}
-              className="w-1/3 rounded-lg border border-gray-600 bg-transparent py-4 font-bold text-gray-400 transition-all hover:bg-gray-800 hover:text-white disabled:opacity-50"
-            >
-              Decline
-            </button>
-            <button 
               type="submit" 
               disabled={!termsAccepted || signature.length < 3 || isProcessing}
-              className="w-2/3 rounded-lg bg-orange-600 py-4 font-bold text-white transition-all hover:bg-orange-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-500 shadow-[0_0_15px_rgba(249,115,22,0.3)] hover:shadow-[0_0_25px_rgba(249,115,22,0.5)]"
+              className="w-full rounded-lg bg-orange-600 py-4 font-bold text-white transition-all hover:bg-orange-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-500 shadow-[0_0_15px_rgba(249,115,22,0.3)] hover:shadow-[0_0_25px_rgba(249,115,22,0.5)]"
             >
               {isProcessing ? "Processing..." : "Accept & Pay Deposit"}
             </button>
